@@ -1,0 +1,14 @@
+- [x] onboard flow
+    - oMLX endpoint
+    - api key
+- [x] ETEditSettings
+- [ ] vim api tools
+    - read
+    - edit
+    - write
+- [ ] tools looping pipeline
+    - temp memory with prompt chaining
+    - websearch & context7 
+    - loop to ask agent if still requires another websearch & context7
+- [ ] quickfix integration
+- [ ] diagnosis integration
