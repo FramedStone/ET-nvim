@@ -58,19 +58,21 @@ local function build_chat_body(prompt, messages)
 	if model == nil or model == '' then
 		error('oMLX model is required. Configure ET with omlx.model before chatting.')
 	end
+	local sampling = config.get_sampling_params()
+	local chat_template_kwargs = sampling.chat_template_kwargs or {}
 
 	return {
 		prompt = prompt,
 		messages = messages,
 		model = model,
-		temperature = config.get_sampling_params().temperature,
-		max_tokens = config.get_sampling_params().max_tokens,
-		top_p = config.get_sampling_params().top_p,
-		top_k = config.get_sampling_params().top_k,
-		repetition_penalty = config.get_sampling_params().repetition_penalty,
-		presence_penalty = config.get_sampling_params().presence_penalty,
-		enable_thinking = config.get_sampling_params().chat_template_kwargs.enable_thinking,
-		reasoning_effort = config.get_sampling_params().chat_template_kwargs.reasoning_effort,
+		temperature = sampling.temperature,
+		max_tokens = sampling.max_tokens,
+		top_p = sampling.top_p,
+		top_k = sampling.top_k,
+		repetition_penalty = sampling.repetition_penalty,
+		presence_penalty = sampling.presence_penalty,
+		enable_thinking = chat_template_kwargs.enable_thinking,
+		reasoning_effort = chat_template_kwargs.reasoning_effort,
 	}
 end
 
