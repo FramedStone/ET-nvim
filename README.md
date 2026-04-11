@@ -1,4 +1,4 @@
-# Simple Neovim AI Agent made for (oMLX)[https://github.com/jundot/omlx]
+# Simple Neovim AI Agent made for [oMLX](https://github.com/jundot/omlx)
 - onboard flow
 - stateless memory
 - tools
