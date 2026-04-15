@@ -1,12 +1,12 @@
 local M = {}
+local state = require('ET.state')
 
--- public API functions ET.setup({})
-function M.setup(config)
-	require('ET.config').set_config(config or {})
+function M.setup()
+	print('ET.nvim loaded')
 end
 
 function M.init()
-	require('ET.state').reset_state()
+	state.reset_state()
 end
 
 return M
