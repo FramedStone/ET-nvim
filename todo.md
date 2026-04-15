@@ -8,7 +8,7 @@
     - model
     - temp history
     - tool results
-- [ ] ETSwitchModel
+- [x] ETSwitchModel
 - [x] ETEditSettings (config.json)
 - [ ] ETFilePicker
 - [ ] ETRangeSelect
