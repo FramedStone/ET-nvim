@@ -6,12 +6,10 @@
     - api key
 - [ ] states
     - model
-    - plenary popup
     - temp history
     - tool results
-- [ ] utils
 - [ ] ETSwitchModel
-- [ ] ETEditSettings (config.json)
+- [x] ETEditSettings (config.json)
 - [ ] ETFilePicker
 - [ ] ETRangeSelect
 - [ ] vim api tools
