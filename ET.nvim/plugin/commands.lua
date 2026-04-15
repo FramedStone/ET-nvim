@@ -1,4 +1,5 @@
 -- local agent = require('ET.agent')
+local config = require('ET.config')
 
 vim.api.nvim_create_user_command('ETChat', function()
 	-- agent.start_mode('chat')
@@ -8,6 +9,6 @@ vim.api.nvim_create_user_command('ETSwitchModel', function()
 	-- agent.switch_model()
 end, { desc = 'Switch ET model' })
 
-vim.api.nvim_create_user_command('ETOnboard', function()
-	-- onboard.start()
-end, { desc = 'Start ET onboarding process' })
+vim.api.nvim_create_user_command('ETEditSettings', function()
+	config.set_config()
+end, { desc = 'Edit ET configuration' })
