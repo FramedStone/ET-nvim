@@ -1,9 +1,9 @@
-- [ ] move ETOnboard into commands.lua
-- [ ] provider - omlx.lua
+- [x] move ETOnboard into commands.lua
+- [x] config.lua
+- [ ] reusable plenary popup
 - [ ] ETOnboard
     - oMLX endpoint
     - api key
-- [ ] reusable plenary popup
 - [ ] states
     - model
     - plenary popup
@@ -22,6 +22,8 @@
 - [ ] external tools
    - bravesearch
    - context7
+- [ ] pr flow for any edits
+    - [ ] temp buffer for pr
 - [ ] modes integration
     - ETChat
     - ET (visual mode)
