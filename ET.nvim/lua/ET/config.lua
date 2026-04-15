@@ -1,57 +1,39 @@
 local M = {}
-
--- Default configuration
-local default_config = {
-	provider = 'omlx',
-	omlx = {
-		endpoint = 'http://localhost:8000/v1',
-		api_key = '',
-		model = nil,
-	},
+local path = vim.fn.stdpath('config') .. '/.et/config.json'
+local config = {
+	endpoint = 'http://localhost:8000/v1',
+	api_key = '',
+	model = vim.NIL,
 	sampling_params = {
-		temperatur = nil,
-		max_tokens = nil,
-		top_p = nil,
-		top_k = nil,
-		repetition_penalty = nil,
-		presence_penalty = nil,
+		temperature = vim.NIL,
+		max_tokens = vim.NIL,
+		top_p = vim.NIL,
+		top_k = vim.NIL,
+		repetition_penalty = vim.NIL,
+		presence_penalty = vim.NIL,
 		chat_template_kwargs = {
 			enable_thinking = true,
-			reasoning_effort = 'medium',
+			reasoning_effort = vim.NIL,
 		},
 	},
 }
 
--- Config file path - in user's home directory under .et/
-local config_path = vim.fn.stdpath('config') .. '/.et/config.json'
-
-function M.save_config(user_config)
-	local json_content = vim.fn.json_encode(user_config)
-	vim.fn.writefile({ json_content }, config_path)
-end
-
-function M.load_config()
-	local content
-	local ok, err = pcall(function()
-		content = vim.fn.readfile(config_path)
-	end)
-	if ok and content and type(content) == 'table' and #content > 0 then
-		local merged = table.concat(content, '')
-		return vim.fn.json_decode(merged) or {}
-	end
-	M.save_config(default_config)
-	return default_config
-end
-
 function M.get_config()
-	local user_config = M.load_config()
-	return vim.tbl_deep_extend('force', {}, default_config, user_config)
+	return config
 end
 
-function M.set_config(config)
-	local user_config = M.load_config()
-	user_config = vim.tbl_deep_extend('force', user_config, config or {})
-	M.save_config(user_config)
+function M.set_config()
+	local dir = vim.fn.fnamemodify(path, ':h')
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, 'p')
+	end
+
+	if vim.fn.filereadable(path) == 0 then
+		local json = vim.fn.json_encode(config)
+		vim.fn.writefile({ json }, path)
+	end
+
+	vim.cmd('edit ' .. path)
 end
 
 return M
