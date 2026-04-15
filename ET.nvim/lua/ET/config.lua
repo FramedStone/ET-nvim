@@ -19,6 +19,13 @@ local config = {
 }
 
 function M.get_config()
+	if vim.fn.filereadable(path) == 1 then
+		local content = vim.fn.readfile(path)
+		local ok, decoded = pcall(vim.fn.json_decode, table.concat(content, ""))
+		if ok then
+			return vim.tbl_deep_extend("force", config, decoded)
+		end
+	end
 	return config
 end
 
@@ -31,6 +38,11 @@ function M.set_config()
 	if vim.fn.filereadable(path) == 0 then
 		local json = vim.fn.json_encode(config)
 		vim.fn.writefile({ json }, path)
+
+		-- Beautify config.json with fixjson if available
+		if vim.fn.executable('fixjson') == 1 then
+			vim.fn.system('fixjson --write ' .. path)
+		end
 	end
 
 	vim.cmd('edit ' .. path)
