@@ -1,11 +1,31 @@
-- [x] onboard flow
+- [ ] move ETOnboard into commands.lua
+- [ ] provider - omlx.lua
+- [ ] ETOnboard
     - oMLX endpoint
     - api key
-- [x] ETEditSettings
+- [ ] reusable plenary popup
+- [ ] states
+    - model
+    - plenary popup
+    - temp history
+    - tool results
+- [ ] utils
+- [ ] ETSwitchModel
+- [ ] ETEditSettings (config.json)
+- [ ] ETFilePicker
+- [ ] ETRangeSelect
 - [ ] vim api tools
+    - find
     - read
     - edit
     - write
+- [ ] external tools
+   - bravesearch
+   - context7
+- [ ] modes integration
+    - ETChat
+    - ET (visual mode)
+- [ ] logging system
 - [ ] tools looping pipeline
     - temp memory with prompt chaining
     - websearch & context7 
