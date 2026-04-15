@@ -1,12 +1,31 @@
 -- local agent = require('ET.agent')
 local config = require('ET.config')
+local popup = require('ET.popup')
 
 vim.api.nvim_create_user_command('ETChat', function()
 	-- agent.start_mode('chat')
 end, { desc = 'Open ET chat popup' })
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
-	-- agent.switch_model()
+	local models = config.get_models()
+
+	local bufnr, win_id = popup.create_popup('Select Model', 50, #models)
+	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, models)
+
+	local function select_model()
+		local cursor = vim.api.nvim_win_get_cursor(win_id)
+		local selected = models[cursor[1]]
+		local cfg = config.get_config()
+		cfg.model = selected
+		config.set_config(cfg)
+		vim.api.nvim_win_close(win_id, true)
+		vim.notify('ET.nvim: Switched to model ' .. selected)
+	end
+
+	vim.keymap.set('n', '<CR>', select_model, { buffer = bufnr, silent = true })
+	vim.keymap.set('n', 'q', function()
+		vim.api.nvim_win_close(win_id, true)
+	end, { buffer = bufnr, silent = true })
 end, { desc = 'Switch ET model' })
 
 vim.api.nvim_create_user_command('ETEditSettings', function()

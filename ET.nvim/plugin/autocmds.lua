@@ -7,7 +7,21 @@ vim.api.nvim_create_autocmd('VimEnter', {
 		if vim.fn.filereadable(path) == 0 then
 			config.set_config()
 		else
-			config.get_config()
+			local cfg = config.get_config()
+			if cfg.model == vim.NIL or cfg.model == '' then
+				local models = config.get_models()
+				if #models > 0 then
+					cfg.model = models[1]
+					-- Write back to config file
+					local dir = vim.fn.fnamemodify(path, ':h')
+					if vim.fn.isdirectory(dir) == 0 then
+						vim.fn.mkdir(dir, 'p')
+					end
+					local json = vim.fn.json_encode(cfg)
+					vim.fn.writefile({ json }, path)
+					print('model set as ')
+				end
+			end
 		end
 	end,
 })
