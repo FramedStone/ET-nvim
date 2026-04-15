@@ -1,7 +1,7 @@
 - [x] move ETOnboard into commands.lua
 - [x] config.lua
-- [ ] reusable plenary popup
-- [ ] ETOnboard
+- [x] reusable plenary popup
+- [x] ETOnboard
     - oMLX endpoint
     - api key
 - [ ] states
