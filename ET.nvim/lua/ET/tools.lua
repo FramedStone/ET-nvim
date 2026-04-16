@@ -69,4 +69,13 @@ function M.edit_file(filepath, start_line, end_line, contents)
 	return true
 end
 
+function M.write_file(filepath, contents)
+	if type(contents) == "string" then
+		contents = vim.split(contents, '\n')
+	end
+
+	local result = vim.fn.writefile(contents, filepath)
+	return result == 0
+end
+
 return M
