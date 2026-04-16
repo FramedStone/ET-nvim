@@ -44,4 +44,11 @@ function M.find_files(filenames)
 	return results
 end
 
+function M.read_file(filepath)
+	local lines = vim.fn.readfile(filepath)
+	if lines then
+		return table.concat(lines, '\n')
+	end
+end
+
 return M
