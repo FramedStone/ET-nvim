@@ -9,7 +9,7 @@
 - [x] ETFilePicker
 - [x] ET
     - load first model as default
-- [ ] vim api tools
+- [x] vim api tools
     - find
     - read
     - edit
