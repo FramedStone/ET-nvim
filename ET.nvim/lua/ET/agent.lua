@@ -1,5 +1,19 @@
 local M = {}
 local temp_history = {}
 local popup = require('ET.popup')
+local config = require('ET.config')
+
+function M.init()
+	local cfg = config.get_config()
+	if cfg.model == vim.NIL then
+		local models = config.get_models()
+		if #models > 0 then
+			cfg.model = models[1]
+			config.set_config(cfg)
+		else
+			config.set_config()
+		end
+	end
+end
 
 return M
