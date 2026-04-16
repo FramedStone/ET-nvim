@@ -4,14 +4,10 @@
 - [x] ETOnboard
     - oMLX endpoint
     - api key
-- [ ] states
-    - model
-    - temp history
-    - tool results
 - [x] ETSwitchModel
 - [x] ETEditSettings (config.json)
-- [ ] ETFilePicker
-- [ ] ETRangeSelect
+- [x] ETFilePicker
+- [ ] ET
 - [ ] vim api tools
     - find
     - read
