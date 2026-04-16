@@ -1,5 +1,6 @@
 local M = {}
 local curl = require('plenary.curl')
+local popup = require('ET.popup')
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
 	endpoint = 'http://localhost:8000/v1',
@@ -45,17 +46,21 @@ function M.set_config(new_config)
 		return
 	end
 
-	if vim.fn.filereadable(path) == 0 then
-		local json = vim.fn.json_encode(config)
-		vim.fn.writefile({ json }, path)
+	local cfg = M.get_config()
 
-		-- Beautify config.json with fixjson if available
+	if vim.fn.filereadable(path) == 0 then
+		local json = vim.fn.json_encode(cfg)
+		vim.fn.writefile({ json }, path)
 		if vim.fn.executable('fixjson') == 1 then
 			vim.fn.system('fixjson --write ' .. path)
 		end
 	end
 
-	vim.cmd('edit ' .. path)
+	local bufnr, win_id = popup.create_popup('Edit Settings', 60, 20)
+	vim.api.nvim_win_call(win_id, function()
+		vim.cmd('edit ' .. path)
+		vim.bo.filetype = 'json'
+	end)
 end
 
 function M.get_models()
