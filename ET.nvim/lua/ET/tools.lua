@@ -51,4 +51,22 @@ function M.read_file(filepath)
 	end
 end
 
+-- Open file with temp buffer, replace contents within start_line & end_line
+function M.edit_file(filepath, start_line, end_line, contents)
+	local bufnr = vim.fn.bufadd(filepath)
+	vim.fn.bufload(bufnr)
+
+	if type(contents) == 'string' then
+		contents = vim.split(contents, '\n')
+	end
+
+	vim.api.nvim_buf_set_lines(bufnr, start_line - 1, end_line, false, contents)
+
+	vim.api.nvim_buf_call(bufnr, function()
+		vim.cmd('write')
+	end)
+
+	return true
+end
+
 return M
