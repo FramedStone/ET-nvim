@@ -1,0 +1,5 @@
+Dependencies Plugins
+1. Plenary.nvim
+
+Formatter
+1. fixjson

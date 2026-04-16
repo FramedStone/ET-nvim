@@ -31,36 +31,29 @@ function M.get_config()
 	return config
 end
 
-function M.set_config(new_config)
-	local dir = vim.fn.fnamemodify(path, ':h')
-	if vim.fn.isdirectory(dir) == 0 then
-		vim.fn.mkdir(dir, 'p')
-	end
-
-	if new_config then
-		local json = vim.fn.json_encode(new_config)
-		vim.fn.writefile({ json }, path)
-		if vim.fn.executable('fixjson') == 1 then
-			vim.fn.system('fixjson --write ' .. path)
-		end
-		return
-	end
-
+function M.set_config()
 	local cfg = M.get_config()
 
+	-- Create when config.json not found
 	if vim.fn.filereadable(path) == 0 then
 		local json = vim.fn.json_encode(cfg)
 		vim.fn.writefile({ json }, path)
-		if vim.fn.executable('fixjson') == 1 then
-			vim.fn.system('fixjson --write ' .. path)
-		end
+		vim.fn.system('fixjson --write ' .. path)
 	end
 
+	local content = vim.fn.readfile(path)
 	local bufnr, win_id = popup.create_popup('Edit Settings', 60, 20)
-	vim.api.nvim_win_call(win_id, function()
-		vim.cmd('edit ' .. path)
-		vim.bo.filetype = 'json'
-	end)
+	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
+	vim.bo.filetype = 'json'
+
+	local function save_and_close()
+		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		vim.fn.writefile(lines, path)
+		vim.fn.system('fixjson --write ' .. path)
+		vim.api.nvim_win_close(win_id, true)
+	end
+
+	vim.keymap.set('n', ':wq<CR>', save_and_close, { buffer = bufnr, silent = true })
 end
 
 function M.get_models()
