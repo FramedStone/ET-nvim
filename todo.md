@@ -8,6 +8,7 @@
 - [x] ETEditSettings (config.json)
 - [x] ETFilePicker
 - [ ] ET
+    - load first model as default
 - [ ] vim api tools
     - find
     - read
