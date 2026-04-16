@@ -45,3 +45,7 @@ vim.api.nvim_create_user_command('ETChat', function()
 	-- TODO
 	-- agent.open_chat()
 end, { desc = 'Chat with ET' })
+
+vim.api.nvim_create_user_command('ETInstallTools', function()
+	tools.setup_external_tools()
+end, { desc = 'Install External Tools' })

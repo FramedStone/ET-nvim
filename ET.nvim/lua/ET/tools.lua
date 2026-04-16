@@ -70,7 +70,7 @@ function M.edit_file(filepath, start_line, end_line, contents)
 end
 
 function M.write_file(filepath, contents)
-	if type(contents) == "string" then
+	if type(contents) == 'string' then
 		contents = vim.split(contents, '\n')
 	end
 
@@ -78,4 +78,26 @@ function M.write_file(filepath, contents)
 	return result == 0
 end
 
+---------------------------------- External Tools -----------------------------------------------
+function M.setup_external_tools()
+	if vim.fn.has('mac') then
+		-- bravesearch
+		-- https://github.com/brave/brave-search-cli
+
+		-- context7
+		-- https://github.com/upstash/context7/blob/master/skills/context7-cli/SKILL.md
+		vim.cmd(
+			'terminal curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh && brew install ctx7'
+		)
+	else
+		vim.cmd(
+			'terminal powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.ps1 | iex; bun install ctx7"'
+		)
+	end
+end
+
+--  web         Full web search — pages, discussions, FAQ, infobox, news, videos
+--  news        News search — articles with freshness filters (pd/pw/pm/py or date range)
+--  images      Image search — thumbnails, sources, dimensions
+--  videos      Video search — titles, URLs, thumbnails, durations
 return M
