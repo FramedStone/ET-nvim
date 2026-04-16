@@ -36,6 +36,7 @@ end, { desc = '' })
 vim.api.nvim_create_user_command('ET', function(opts)
 	tools.select_line_of_codes(opts)
 	-- TODO
+	-- agent.init()
 	-- agent.open_chat()
 	-- agent.insert_into_popup(object)
 end, { range = true, desc = 'Parse Highlighted Line of Codes into ETAgent' })
