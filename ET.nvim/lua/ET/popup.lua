@@ -1,7 +1,6 @@
 local M = {}
 local popup = require('plenary.popup')
 
--- TODO: expose a callback to close the popup state properly
 function M.create_popup(title, width, height)
 	width = math.max(width or 50)
 	height = math.max(height or 1)
