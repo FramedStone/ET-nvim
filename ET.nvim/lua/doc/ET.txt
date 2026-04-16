@@ -1,5 +1,6 @@
 Dependencies Plugins
 1. Plenary.nvim
+2. fzf-lua.nvim
 
 Formatter
 1. fixjson
