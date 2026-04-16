@@ -27,4 +27,21 @@ function M.select_line_of_codes(opts)
 	local out = abs .. anchor
 end
 
+-- Receive filename(s), return absolute path(s)
+function M.find_files(filenames)
+	local results = {}
+	for _, filename in ipairs(filenames) do
+		local output = vim.fn.system(string.format('find . -name "%s"', filename))
+		if output and output ~= '' then
+			for _, path in ipairs(vim.split(output, '\n')) do
+				if path ~= '' then
+					local abs_path = vim.fn.fnamemodify(path, ':p')
+					table.insert(results, abs_path)
+				end
+			end
+		end
+	end
+	return results
+end
+
 return M

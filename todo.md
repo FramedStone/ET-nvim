@@ -7,7 +7,7 @@
 - [x] ETSwitchModel
 - [x] ETEditSettings (config.json)
 - [x] ETFilePicker
-- [ ] ET
+- [x] ET
     - load first model as default
 - [ ] vim api tools
     - find
