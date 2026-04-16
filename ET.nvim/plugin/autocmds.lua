@@ -1,6 +1,8 @@
 local config = require('ET.config')
 
 vim.api.nvim_create_autocmd('VimEnter', {
+	-- Onboard if config.json not found
+	-- Select first model returned from oMLX endpoint as default
 	group = vim.api.nvim_create_augroup('ETOnboard', { clear = true }),
 	callback = function()
 		local path = vim.fn.stdpath('config') .. '/.et/config.json'
@@ -19,7 +21,6 @@ vim.api.nvim_create_autocmd('VimEnter', {
 					end
 					local json = vim.fn.json_encode(cfg)
 					vim.fn.writefile({ json }, path)
-					print('model set as ')
 				end
 			end
 		end
