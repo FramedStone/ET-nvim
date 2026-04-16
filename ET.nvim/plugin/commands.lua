@@ -1,10 +1,7 @@
 -- local agent = require('ET.agent')
 local config = require('ET.config')
 local popup = require('ET.popup')
-
-vim.api.nvim_create_user_command('ETChat', function()
-	-- agent.start_mode('chat')
-end, { desc = 'Open ET chat popup' })
+local tools = require('ET.tools')
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
 	local models = config.get_models()
@@ -31,3 +28,19 @@ end, { desc = 'Switch ET model' })
 vim.api.nvim_create_user_command('ETEditSettings', function()
 	config.set_config()
 end, { desc = 'Edit ET configuration' })
+
+vim.api.nvim_create_user_command('ETFilePicker', function()
+	tools.select_files()
+end, { desc = '' })
+
+vim.api.nvim_create_user_command('ET', function(opts)
+	tools.select_line_of_codes(opts)
+	-- TODO
+	-- agent.open_chat()
+	-- agent.insert_into_popup(object)
+end, { range = true, desc = 'Parse Highlighted Line of Codes into ETAgent' })
+
+vim.api.nvim_create_user_command('ETChat', function()
+	-- TODO
+	-- agent.open_chat()
+end, { desc = 'Chat with ET' })
