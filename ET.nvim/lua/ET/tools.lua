@@ -96,8 +96,60 @@ function M.setup_external_tools()
 	end
 end
 
+-- BraveSearch
 --  web         Full web search — pages, discussions, FAQ, infobox, news, videos
 --  news        News search — articles with freshness filters (pd/pw/pm/py or date range)
 --  images      Image search — thumbnails, sources, dimensions
---  videos      Video search — titles, URLs, thumbnails, durations
+--  videos     Video search — titles, URLs, thumbnails, durations
+function M.use_brave_search(type, query_content)
+	local valid_types = {
+		web = true,
+		news = true,
+		images = true,
+		videos = true,
+	}
+
+	if not valid_types[type] then
+		error('Invalid type: ' .. type .. '. Must be one of: web, news, images, videos')
+	end
+
+	local cmd = string.format('bx %s "%s"', type, query_content)
+	local result = vim.fn.system(cmd)
+
+	if vim.v.shell_error ~= 0 then
+		error('BraveSearch failed: ' .. result)
+	end
+
+	return result
+end
+
+-- Context7
+-- # Query library documentation
+-- ctx7 library react "how to use hooks"
+-- ctx7 docs /facebook/react "useEffect examples"
+function M.use_context7(type, query_content)
+	local valid_types = {
+		library = true,
+		docs = true,
+		skills = {
+			search = false,
+			install = false,
+			list = false,
+			remove = false,
+		},
+	}
+
+	if not valid_types[type] then
+		error('Invalid type: ' .. type .. '. Must be one of: library, docs')
+	end
+
+	local cmd = string.format('ctx7 %s "%s"', type, query_content)
+	local result = vim.fn.system(cmd)
+
+	if vim.v.shell_error ~= 0 then
+		error('Context7 failed: ' .. result)
+	end
+
+	return result
+end
 return M
