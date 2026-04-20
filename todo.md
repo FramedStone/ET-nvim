@@ -14,7 +14,7 @@
     - read
     - edit
     - write
-- [ ] external tools
+- [x] external tools
    - bravesearch
    - context7
 - [ ] pr flow for any edits
