@@ -3,6 +3,7 @@ local temp_history = {}
 local popup = require('ET.popup')
 local config = require('ET.config')
 
+-- Set first model as default model
 function M.init()
 	local cfg = config.get_config()
 	if cfg.model == vim.NIL then
@@ -16,4 +17,8 @@ function M.init()
 	end
 end
 
+function M.chat()
+	-- main popup wrapping 2 popups (bravesearch, context7)
+	-- if bravesearch or context7 has values --> seperate prompts into models
+end
 return M
