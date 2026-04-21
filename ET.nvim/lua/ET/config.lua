@@ -31,14 +31,24 @@ function M.get_config()
 	return config
 end
 
-function M.set_config()
-	local cfg = M.get_config()
+function M.set_config(cfg)
+	local cfg = cfg or M.get_config()
 
-	-- Create when config.json not found
 	if vim.fn.filereadable(path) == 0 then
+		local dir = vim.fn.stdpath('config') .. '/.et'
+		if vim.fn.isdirectory(dir) == 0 then
+			vim.fn.mkdir(dir, 'p')
+		end
 		local json = vim.fn.json_encode(cfg)
 		vim.fn.writefile({ json }, path)
 		vim.fn.system('fixjson --write ' .. path)
+	end
+
+	if cfg then
+		local json = vim.fn.json_encode(cfg)
+		vim.fn.writefile({ json }, path)
+		vim.fn.system('fixjson --write ' .. path)
+		return
 	end
 
 	local content = vim.fn.readfile(path)
