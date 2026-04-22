@@ -6,23 +6,17 @@ local tools = require('ET.tools')
 vim.api.nvim_create_user_command('ETSwitchModel', function()
 	local models = config.get_models()
 
-	local bufnr, win_id = popup.create_popup('Select Model', 50, #models)
-	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, models)
+	local model_items = {}
+	for _, model in ipairs(models) do
+		table.insert(model_items, { text = model })
+	end
 
-	local function select_model()
-		local cursor = vim.api.nvim_win_get_cursor(win_id)
-		local selected = models[cursor[1]]
+	popup.create_menu('Select Model', model_items, function(selected)
 		local cfg = config.get_config()
 		cfg.model = selected
 		config.set_config(cfg)
-		vim.api.nvim_win_close(win_id, true)
 		vim.notify('ET.nvim: Switched to model ' .. selected)
-	end
-
-	vim.keymap.set('n', '<CR>', select_model, { buffer = bufnr, silent = true })
-	vim.keymap.set('n', 'q', function()
-		vim.api.nvim_win_close(win_id, true)
-	end, { buffer = bufnr, silent = true })
+	end, 25, #model_items + 1)
 end, { desc = 'Switch ET model' })
 
 vim.api.nvim_create_user_command('ETEditSettings', function()
