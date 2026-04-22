@@ -1,21 +1,58 @@
 local M = {}
-local popup = require('plenary.popup')
+local Popup = require('nui.popup')
+local Input = require('nui.input')
 
 function M.create_popup(title, width, height)
-	width = math.max(width or 50)
-	height = math.max(height or 1)
+	width = width or 50
+	height = height or 10
 
-	local bufnr = vim.api.nvim_create_buf(false, true)
-	local win_id, opts = popup.create(bufnr, {
-		title = title,
-		line = math.floor(((vim.o.lines - height) / 2) - 1),
-		col = math.floor((vim.o.columns - width) / 2),
-		minwidth = width,
-		minheight = height,
-		border = true,
+	local popup = Popup({
+		enter = true,
+		focusable = true,
+		position = '50%',
+		size = { width = width, height = height },
+		border = {
+			style = 'single',
+			text = {
+				top = title,
+				top_align = 'left',
+			},
+		},
+		buf_options = {
+			buftype = '',
+			modifiable = true,
+			readonly = false,
+		},
 	})
 
-	return bufnr, win_id
+	popup:mount()
+	return popup
 end
+
+function M.create_input(title, width, height, placeholder, on_submit)
+	width = width or 50
+	height = height or 1
+
+	local input = Input({
+		position = '50%',
+		size = { width = width, height = height },
+		border = {
+			style = 'single',
+			text = {
+				top = title,
+				top_align = 'left',
+			},
+		},
+		{
+			default_value = placeholder,
+			on_submit = on_submit,
+		},
+	})
+
+	input:mount()
+	return input
+end
+
+function M.create_menu(title, width, height, items) end
 
 return M

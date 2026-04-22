@@ -31,39 +31,62 @@ function M.get_config()
 	return config
 end
 
-function M.set_config(cfg)
-	local cfg = cfg or M.get_config()
+function M.set_config(cfg, on_submit)
+	if type(cfg) == 'function' then
+		on_submit = cfg
+		cfg = nil
+	end
 
-	if vim.fn.filereadable(path) == 0 then
-		local dir = vim.fn.stdpath('config') .. '/.et'
-		if vim.fn.isdirectory(dir) == 0 then
-			vim.fn.mkdir(dir, 'p')
-		end
-		local json = vim.fn.json_encode(cfg)
-		vim.fn.writefile({ json }, path)
-		vim.fn.system('fixjson --write ' .. path)
+	if on_submit then
+		popup.create_input('Set Config', function(value)
+			local ok, decoded = pcall(vim.fn.json_decode, value)
+			if ok then
+				M.set_config(decoded)
+			end
+			on_submit(decoded)
+		end, vim.fn.json_encode(M.get_config()))
+		return
 	end
 
 	if cfg then
+		if vim.fn.filereadable(path) == 0 then
+			local dir = vim.fn.stdpath('config') .. '/.et'
+			if vim.fn.isdirectory(dir) == 0 then
+				vim.fn.mkdir(dir, 'p')
+			end
+		end
 		local json = vim.fn.json_encode(cfg)
 		vim.fn.writefile({ json }, path)
 		vim.fn.system('fixjson --write ' .. path)
 		return
 	end
 
-	local content = vim.fn.readfile(path)
-	local bufnr, win_id = popup.create_popup('Edit Settings', 60, 20)
-	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
-	vim.bo.filetype = 'json'
+	local current = M.get_config()
+	local p = popup.create_popup('Edit Settings', 60, 20)
+
+	local temp = '/tmp/et_config_temp.json'
+	local json = vim.fn.json_encode(current)
+	vim.fn.writefile({ json }, temp)
+	vim.fn.system('fixjson --write "' .. temp .. '"')
+	local formatted = vim.fn.readfile(temp)
+	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
+	vim.api.nvim_buf_set_option(p.bufnr, 'filetype', 'json')
 
 	local function save_and_close()
-		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		local lines = vim.api.nvim_buf_get_lines(p.bufnr, 0, -1, false)
 		vim.fn.writefile(lines, path)
-		vim.fn.system('fixjson --write ' .. path)
-		vim.api.nvim_win_close(win_id, true)
+		vim.fn.system('fixjson --write "' .. path .. '"')
 	end
 
-	vim.keymap.set('n', ':wq<CR>', save_and_close, { buffer = bufnr, silent = true })
+	local function close_popup()
+		p:unmount()
+	end
+
+	p:map('n', ':wq<CR>', function()
+		save_and_close()
+		p:unmount()
+	end, { noremap = true })
+	p:map('n', 'q', close_popup, { noremap = true })
 end
 
 function M.get_models()
