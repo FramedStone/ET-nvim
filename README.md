@@ -14,7 +14,7 @@ oMLX default config
 - api_key (if any)
 
 external plugins
-- plenary
+- nui
 - fzf-lua
 
 formatter
