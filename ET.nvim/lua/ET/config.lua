@@ -62,13 +62,15 @@ function M.set_config(cfg, on_submit)
 	end
 
 	local current = M.get_config()
-	local p = popup.create_popup('Edit Settings', 60, 20)
-
+	local current_json = vim.fn.json_encode(current)
 	local temp = '/tmp/et_config_temp.json'
-	local json = vim.fn.json_encode(current)
-	vim.fn.writefile({ json }, temp)
+	vim.fn.writefile({ current_json }, temp)
 	vim.fn.system('fixjson --write "' .. temp .. '"')
 	local formatted = vim.fn.readfile(temp)
+	local height = #formatted
+
+	local p = popup.create_popup('Edit Settings', 60, height)
+
 	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
 	vim.api.nvim_buf_set_option(p.bufnr, 'filetype', 'json')
 
