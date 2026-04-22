@@ -1,6 +1,6 @@
 -- local agent = require('ET.agent')
 local config = require('ET.config')
-local popup = require('ET.popup')
+local popup = require('ET.ui')
 local tools = require('ET.tools')
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
