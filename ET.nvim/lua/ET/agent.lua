@@ -1,6 +1,5 @@
 local M = {}
 local temp_history = {}
-local popup = require('ET.popup')
 local config = require('ET.config')
 
 -- Set first model as default model
