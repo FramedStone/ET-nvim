@@ -1,6 +1,6 @@
 local M = {}
 local curl = require('plenary.curl')
-local popup = require('ET.popup')
+local popup = require('ET.ui')
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
 	endpoint = 'http://localhost:8000/v1',
