@@ -19,6 +19,7 @@
    - context7
 - [x] nui.menu for ETSwitchModel
 - [ ] pr flow for any edits
+    - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
 - [ ] modes integration
     - ETChat
