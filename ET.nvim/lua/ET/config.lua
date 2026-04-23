@@ -1,6 +1,6 @@
 local M = {}
 local curl = require('plenary.curl')
-local popup = require('ET.ui')
+local ui = require('ET.ui')
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
 	endpoint = 'http://localhost:8000/v1',
@@ -31,23 +31,7 @@ function M.get_config()
 	return config
 end
 
-function M.set_config(cfg, on_submit)
-	if type(cfg) == 'function' then
-		on_submit = cfg
-		cfg = nil
-	end
-
-	if on_submit then
-		popup.create_input('Set Config', function(value)
-			local ok, decoded = pcall(vim.fn.json_decode, value)
-			if ok then
-				M.set_config(decoded)
-			end
-			on_submit(decoded)
-		end, vim.fn.json_encode(M.get_config()))
-		return
-	end
-
+function M.set_config(cfg)
 	if cfg then
 		if vim.fn.filereadable(path) == 0 then
 			local dir = vim.fn.stdpath('config') .. '/.et'
@@ -69,15 +53,19 @@ function M.set_config(cfg, on_submit)
 	local formatted = vim.fn.readfile(temp)
 	local height = #formatted
 
-	local p = popup.create_popup('Edit Settings', 60, height)
+	local p = ui.create_popup('Edit Settings', 60, height)
 
 	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
-	vim.api.nvim_buf_set_option(p.bufnr, 'filetype', 'json')
 
 	local function save_and_close()
 		local lines = vim.api.nvim_buf_get_lines(p.bufnr, 0, -1, false)
-		vim.fn.writefile(lines, path)
-		vim.fn.system('fixjson --write "' .. path .. '"')
+		local content = table.concat(lines, '\n')
+		local ok, decoded = pcall(vim.fn.json_decode, content)
+		if ok then
+			M.set_config(decoded)
+		else
+			vim.notify('ET.nvim: Invalid JSON', vim.log.levels.ERROR)
+		end
 	end
 
 	local function close_popup()
