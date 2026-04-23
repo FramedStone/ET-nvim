@@ -17,7 +17,7 @@
 - [x] external tools
    - bravesearch
    - context7
-- [ ] nui.menu for ETSwitchModel
+- [x] nui.menu for ETSwitchModel
 - [ ] pr flow for any edits
     - [ ] temp buffer for pr
 - [ ] modes integration

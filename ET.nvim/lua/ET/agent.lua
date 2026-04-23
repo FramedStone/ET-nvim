@@ -1,6 +1,7 @@
 local M = {}
 local temp_history = {}
 local config = require('ET.config')
+local ui = require('ET.ui')
 
 -- Set first model as default model
 function M.init()
