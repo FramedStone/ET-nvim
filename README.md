@@ -1,4 +1,4 @@
-# Simple Neovim AI Agent made for [oMLX](https://github.com/jundot/omlx)
+# Human-First Neovim AI Agent made for [oMLX](https://github.com/jundot/omlx)
 - onboard flow
 - partially stateful memory (temp memory)
 - tools
@@ -19,3 +19,4 @@ external plugins
 
 formatter
 - fixjson
+- jq
