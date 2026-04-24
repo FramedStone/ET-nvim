@@ -21,6 +21,8 @@
 - [ ] pr flow for any edits
     - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
+- [ ] Boxes for tools cherry picking
+- [ ] raw tools results pointing to hippocampus (?)
 - [ ] modes integration
     - ETChat
     - ET (visual mode)
