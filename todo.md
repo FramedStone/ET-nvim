@@ -19,7 +19,7 @@
    - context7
 - [x] nui.menu for ETSwitchModel
 - [ ] wire file picker and range selector into ET
-- [ ] temp history for ETChat
+- [ ] chat history for ETChat
 - [ ] modes
     - [ ] ETVisual (bravesearch/ctx7 --> nvim_tools --> apply edits)
     - [ ] ETChat (back and forth chat with sessions management)

@@ -3,7 +3,7 @@ local chat_ui
 local chat_components
 local layout_components
 local layout_boxes
-local temp_history = {}
+local chat_history = {}
 local config = require('ET.config')
 local ui = require('ET.ui')
 local tools = require('ET.tools')
@@ -84,8 +84,8 @@ function M.init()
 	}
 
 	chat_ui, layout_components, layout_boxes = ui.create_layout(100, 40, {
-		{ dir = 'col', size = 50, { component = temp_history, size = 90 }, { component = main_input, size = 10 } },
-		{ dir = 'col', size = 50, { component = brave_input, size = 50 }, { component = context_input, size = 50 } },
+		{ dir = 'col', size = 70, { component = temp_history, size = 90 }, { component = main_input, size = 10 } },
+		{ dir = 'col', size = 30, { component = brave_input, size = 50 }, { component = context_input, size = 50 } },
 	}, 'row')
 
 	vim.schedule(function()
@@ -107,10 +107,7 @@ function M.open_chat()
 end
 
 function M.prompt()
-	-- main popup wrapping 2 popups (bravesearch, context7)
-	-- if bravesearch or context7 has values --> seperate prompts into models
-	-- cherry picking flow after bravesearch/context7 tools result
-	-- pr flow after using edit/write tools
+	-- Parse Temp History contents (if any) + Input Popup contents to omlx endpoint and stream the result back to Temp History Popup
 end
 
 function M.add()
