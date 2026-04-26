@@ -7,7 +7,7 @@ function M.select_files()
 			['default'] = function(selected)
 				-- Extract the path (strips icons/formatting)
 				local file = fzf.path.entry_to_file(selected[1])
-				-- TODO: parse into Agent
+				-- TODO: insert selected files into ETChat's Input Popup
 				return file.path
 			end,
 		},
