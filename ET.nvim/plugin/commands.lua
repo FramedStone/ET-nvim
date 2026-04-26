@@ -1,4 +1,4 @@
--- local agent = require('ET.agent')
+local agent = require('ET.agent')
 local config = require('ET.config')
 local popup = require('ET.ui')
 local tools = require('ET.tools')
@@ -37,7 +37,7 @@ end, { range = true, desc = 'Parse Highlighted Line of Codes into ETAgent' })
 
 vim.api.nvim_create_user_command('ETChat', function()
 	-- TODO
-	-- agent.open_chat()
+	agent.open_chat()
 end, { desc = 'Chat with ET' })
 
 vim.api.nvim_create_user_command('ETInstallTools', function()
