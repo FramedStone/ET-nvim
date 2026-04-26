@@ -1,4 +1,5 @@
 local M = {}
+local agent = require('ET.agent')
 
 -- Use for public setup via setup({})
 function M.setup(opts)
@@ -15,6 +16,8 @@ function M.setup(opts)
 		vim.notify('\n\nRun :ETInstallTools to install all external tools')
 		vim.notify(string.rep('=', 57))
 	end
+
+	agent.init()
 end
 
 return M
