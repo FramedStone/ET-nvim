@@ -112,4 +112,66 @@ function M.get_models()
 	return models
 end
 
+function M._prompt(contents)
+	local cfg = M.get_config()
+	local url = cfg.endpoint .. '/chat/completions'
+
+	local messages = {}
+	if type(contents) == 'string' then
+		table.insert(messages, { role = 'user', content = contents })
+	elseif type(contents) == 'table' then
+		messages = contents
+	end
+
+	local payload = {
+		model = cfg.model,
+		messages = messages,
+	}
+
+	if cfg.sampling_params then
+		if cfg.sampling_params.temperature ~= vim.NIL then
+			payload.temperature = cfg.sampling_params.temperature
+		end
+		if cfg.sampling_params.max_tokens ~= vim.NIL then
+			payload.max_tokens = cfg.sampling_params.max_tokens
+		end
+		if cfg.sampling_params.top_p ~= vim.NIL then
+			payload.top_p = cfg.sampling_params.top_p
+		end
+		if cfg.sampling_params.top_k ~= vim.NIL then
+			payload.top_k = cfg.sampling_params.top_k
+		end
+		if cfg.sampling_params.repetition_penalty ~= vim.NIL then
+			payload.repetition_penalty = cfg.sampling_params.repetition_penalty
+		end
+		if cfg.sampling_params.presence_penalty ~= vim.NIL then
+			payload.presence_penalty = cfg.sampling_params.presence_penalty
+		end
+	end
+
+	local headers = {
+		['Content-Type'] = 'application/json',
+	}
+	if cfg.api_key and cfg.api_key ~= '' then
+		headers['Authorization'] = 'Bearer ' .. cfg.api_key
+	end
+
+	local response = curl.post(url, {
+		body = vim.fn.json_encode(payload),
+		timeout = 30000,
+		headers = headers,
+	})
+
+	if response.status ~= 200 then
+		return nil, 'Request failed with status: ' .. response.status
+	end
+
+	local ok, decoded = pcall(vim.fn.json_decode, response.body)
+	if not ok or not decoded.choices or #decoded.choices == 0 then
+		return nil, 'Invalid response format'
+	end
+
+	return decoded.choices[1].message.content, nil
+end
+
 return M
