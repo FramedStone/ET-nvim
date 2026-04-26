@@ -1,6 +1,8 @@
 local M = {}
 local chat_ui
 local chat_components
+local layout_components
+local layout_boxes
 local temp_history = {}
 local config = require('ET.config')
 local ui = require('ET.ui')
@@ -21,7 +23,6 @@ function M.init()
 
 	-- load chat ui and hide
 	local Popup = require('nui.popup')
-	local Input = require('nui.input')
 	local temp_history = Popup({
 		border = {
 			style = 'rounded',
@@ -32,9 +33,7 @@ function M.init()
 		},
 	})
 
-	local main_input = Input({
-		position = '50%',
-		size = { width = 40 },
+	local main_input = Popup({
 		border = {
 			style = 'rounded',
 			text = {
@@ -42,43 +41,39 @@ function M.init()
 				top_align = 'center',
 			},
 		},
-	}, {
-		on_submit = function(value)
-			-- TODO
-			print('Input submitted: ' .. value)
-		end,
+		buf_options = {
+			buftype = '',
+			modifiable = true,
+			readonly = false,
+		},
 	})
 
-	local brave_input = Input({
-		position = '50%',
-		size = { width = 40 },
+	local brave_input = Popup({
 		border = {
 			style = 'rounded',
 			text = {
 				top = 'Brave Search',
 			},
 		},
-	}, {
-		on_submit = function(value)
-			-- TODO
-			print('Brave Search: ' .. value)
-		end,
+		buf_options = {
+			buftype = '',
+			modifiable = true,
+			readonly = false,
+		},
 	})
 
-	local context_input = Input({
-		position = '50%',
-		size = { width = 40 },
+	local context_input = Popup({
 		border = {
 			style = 'rounded',
 			text = {
 				top = 'Context7',
 			},
 		},
-	}, {
-		on_submit = function(value)
-			-- TODO
-			print('Context7: ' .. value)
-		end,
+		buf_options = {
+			buftype = '',
+			modifiable = true,
+			readonly = false,
+		},
 	})
 
 	chat_components = {
@@ -88,17 +83,22 @@ function M.init()
 		context_input = context_input,
 	}
 
-	chat_ui = ui.create_layout(100, 40, {
+	chat_ui, layout_components, layout_boxes = ui.create_layout(100, 40, {
 		{ dir = 'col', size = 50, { component = temp_history, size = 90 }, { component = main_input, size = 10 } },
 		{ dir = 'col', size = 50, { component = brave_input, size = 50 }, { component = context_input, size = 50 } },
 	}, 'row')
+
 	vim.schedule(function()
 		chat_ui:hide()
 	end)
 end
 
 function M.open_chat()
+	if not chat_ui then
+		M.init()
+	end
 	chat_ui:show()
+	ui.rebind_keymaps(layout_components, layout_boxes, chat_ui)
 	vim.schedule(function()
 		if chat_components and chat_components.main_input then
 			vim.api.nvim_set_current_win(chat_components.main_input.winid)
