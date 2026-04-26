@@ -107,7 +107,7 @@ function M.open_chat()
 end
 
 function M.prompt()
-	-- Parse Temp History contents (if any) + Input Popup contents to omlx endpoint and stream the result back to Temp History Popup
+	-- get contents from temp_history (if any) --> append with Input Popup
 end
 
 function M.add()
