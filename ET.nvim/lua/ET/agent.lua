@@ -97,7 +97,7 @@ function M.init()
 	end)
 end
 
-function M.show()
+function M.open_chat()
 	chat_ui:show()
 	vim.schedule(function()
 		if chat_components and chat_components.main_input then

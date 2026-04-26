@@ -18,18 +18,17 @@
    - bravesearch
    - context7
 - [x] nui.menu for ETSwitchModel
+- [ ] wire file picker and range selector into ET
+- [ ] temp history for ETChat
+- [ ] modes
+    - [ ] ETVisual (bravesearch/ctx7 --> nvim_tools --> apply edits)
+    - [ ] ETChat (back and forth chat with sessions management)
 - [ ] pr flow for any edits
+    - [ ] vimdiff
     - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
-- [ ] Boxes for tools cherry picking
 - [ ] raw tools results pointing to hippocampus (?)
-- [ ] modes integration
-    - ETChat
-    - ET (visual mode)
 - [ ] logging system
-- [ ] tools looping pipeline
-    - temp memory with prompt chaining
-    - websearch & context7 
-    - loop to ask agent if still requires another websearch & context7
 - [ ] quickfix integration
 - [ ] diagnosis integration
+- [ ] nvim extended tools (e.g. func definition, symbols, func implementation)
