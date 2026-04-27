@@ -112,7 +112,7 @@ function M.get_models()
 	return models
 end
 
-function M._prompt(contents)
+function M._prompt(contents, on_chunk, on_done)
 	local cfg = M.get_config()
 	local url = cfg.endpoint .. '/chat/completions'
 
@@ -126,35 +126,61 @@ function M._prompt(contents)
 	local payload = {
 		model = cfg.model,
 		messages = messages,
+		stream = true,
 	}
 
 	if cfg.sampling_params then
 		payload = vim.tbl_deep_extend('force', payload, cfg.sampling_params)
 	end
 
-	local headers = {
-		['Content-Type'] = 'application/json',
+	local cmd = {
+		'curl', '-s', '-N',
+		'-X', 'POST',
+		'-H', 'Content-Type: application/json',
 	}
 	if cfg.api_key and cfg.api_key ~= '' then
-		headers['Authorization'] = 'Bearer ' .. cfg.api_key
+		table.insert(cmd, '-H')
+		table.insert(cmd, 'Authorization: Bearer ' .. cfg.api_key)
+	end
+	table.insert(cmd, '-d')
+	table.insert(cmd, vim.fn.json_encode(payload))
+	table.insert(cmd, url)
+
+	local full_content = {}
+
+	local function on_stdout(_, data)
+		if data and #data > 0 then
+			for _, line in ipairs(data) do
+				if line:find('^data: ') then
+					local json_str = line:sub(7)
+					if json_str ~= '[DONE]' then
+						local ok, decoded = pcall(vim.fn.json_decode, json_str)
+						if ok and decoded.choices and decoded.choices[1] and decoded.choices[1].delta then
+							local content = decoded.choices[1].delta.content
+							if content then
+								table.insert(full_content, content)
+								if on_chunk then
+									on_chunk(content)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
 	end
 
-	local response = curl.post(url, {
-		body = vim.fn.json_encode(payload),
-		timeout = 30000,
-		headers = headers,
+	local function on_exit(_, code)
+		if on_done then
+			on_done(table.concat(full_content))
+		end
+	end
+
+	vim.fn.jobstart(cmd, {
+		on_stdout = on_stdout,
+		on_exit = on_exit,
+		stdout_buffered = false,
 	})
-
-	if response.status ~= 200 then
-		return nil, 'Request failed with status: ' .. response.status
-	end
-
-	local ok, decoded = pcall(vim.fn.json_decode, response.body)
-	if not ok or not decoded.choices or #decoded.choices == 0 then
-		return nil, 'Invalid response format'
-	end
-
-	return decoded.choices[1].message.content
 end
 
 return M
