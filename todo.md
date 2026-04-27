@@ -18,6 +18,11 @@
    - bravesearch
    - context7
 - [x] nui.menu for ETSwitchModel
+- [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
+    - check for updates (?)
+    - ETBraveSearch
+    - ETCtx7
+    - have pointer to goto that line in chat_history and able to do cherry pick
 - [ ] wire file picker and range selector into ET
 - [ ] chat history for ETChat
 - [ ] modes
