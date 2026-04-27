@@ -20,3 +20,6 @@ external plugins
 formatter
 - fixjson
 - jq
+
+Memory management
+- temp chat history per neovim session
