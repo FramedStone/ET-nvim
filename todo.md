@@ -19,21 +19,18 @@
    - context7
 - [x] nui.menu for ETSwitchModel
 - [x] animation when processing
+- [ ] refactor ui
+- [ ] ETBraveSearch & ETContext7 with input + popup 
+- [ ] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
     - check for updates (?)
     - ETBraveSearch
     - ETCtx7
 - [ ] wire file picker and range selector into ET
-- [ ] chat history for ETChat
-- [ ] modes
-    - [ ] ETVisual (bravesearch/ctx7 --> nvim_tools --> apply edits)
-    - [ ] ETChat (back and forth chat with sessions management)
 - [ ] pr flow for any edits
     - [ ] vimdiff
     - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
-- [ ] raw tools results pointing to hippocampus (?)
-- [ ] logging system
 - [ ] quickfix integration
 - [ ] diagnosis integration
 - [ ] nvim extended tools (e.g. func definition, symbols, func implementation)
