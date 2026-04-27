@@ -35,10 +35,9 @@ vim.api.nvim_create_user_command('ET', function(opts)
 	-- agent.insert_into_popup(object)
 end, { range = true, desc = 'Parse Highlighted Line of Codes into ETAgent' })
 
-vim.api.nvim_create_user_command('ETChat', function()
-	-- TODO
-	agent.open_chat()
-end, { desc = 'Chat with ET' })
+vim.api.nvim_create_user_command('ETBraveSearch', function() end, { desc = '' })
+
+vim.api.nvim_create_user_command('ETContext7', function() end, { desc = '' })
 
 vim.api.nvim_create_user_command('ETInstallTools', function()
 	tools.setup_external_tools()
