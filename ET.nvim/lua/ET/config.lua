@@ -129,24 +129,7 @@ function M._prompt(contents)
 	}
 
 	if cfg.sampling_params then
-		if cfg.sampling_params.temperature ~= vim.NIL then
-			payload.temperature = cfg.sampling_params.temperature
-		end
-		if cfg.sampling_params.max_tokens ~= vim.NIL then
-			payload.max_tokens = cfg.sampling_params.max_tokens
-		end
-		if cfg.sampling_params.top_p ~= vim.NIL then
-			payload.top_p = cfg.sampling_params.top_p
-		end
-		if cfg.sampling_params.top_k ~= vim.NIL then
-			payload.top_k = cfg.sampling_params.top_k
-		end
-		if cfg.sampling_params.repetition_penalty ~= vim.NIL then
-			payload.repetition_penalty = cfg.sampling_params.repetition_penalty
-		end
-		if cfg.sampling_params.presence_penalty ~= vim.NIL then
-			payload.presence_penalty = cfg.sampling_params.presence_penalty
-		end
+		payload = vim.tbl_deep_extend('force', payload, cfg.sampling_params)
 	end
 
 	local headers = {
@@ -171,7 +154,7 @@ function M._prompt(contents)
 		return nil, 'Invalid response format'
 	end
 
-	return decoded.choices[1].message.content, nil
+	return decoded.choices[1].message.content
 end
 
 return M
