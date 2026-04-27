@@ -172,24 +172,46 @@ function M.prompt()
 	end
 	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, user_msg_lines)
 
-	local response, err = config._prompt(chat_history)
-	if err then
-		vim.notify('ET.nvim: ' .. err, vim.log.levels.ERROR)
-		return
-	end
+	local accumulated_response = ''
+	local assistant_start_line = vim.api.nvim_buf_line_count(temp_history_bufnr)
+	local spinner_index = 0
+	local spinner_chars = { '-', '\\', '|', '/' }
+	local spinner_timer = nil
 
-	table.insert(chat_history, { role = 'assistant', content = response })
+	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, { '[assistant]: ' .. spinner_chars[1] })
 
-	local response_lines = vim.split(response, '\n', { plain = true })
-	for i, line in ipairs(response_lines) do
-		response_lines[i] = (i == 1) and '[assistant]: ' .. line or line
-	end
-	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, response_lines)
-	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, { '---' })
+	spinner_timer = vim.fn.timer_start(100, function()
+		spinner_index = (spinner_index % 4) + 1
+		local current_lines = vim.api.nvim_buf_get_lines(temp_history_bufnr, assistant_start_line, -1, false)
+		if #current_lines > 0 and current_lines[1]:match('^%[assistant%]: [%-%\\%|%/]') then
+			current_lines[1] = '[assistant]: ' .. spinner_chars[spinner_index]
+			vim.api.nvim_buf_set_lines(temp_history_bufnr, assistant_start_line, assistant_start_line + 1, false, current_lines)
+		end
+		vim.api.nvim_win_set_cursor(chat_components.temp_history.winid, { vim.api.nvim_buf_line_count(temp_history_bufnr), 1 })
+	end, { ['repeat'] = -1 })
 
-	vim.api.nvim_buf_set_lines(main_input_bufnr, 0, -1, false, {})
-
-	return response
+	config._prompt(chat_history, function(chunk)
+		if spinner_timer then
+			vim.fn.timer_stop(spinner_timer)
+			spinner_timer = nil
+		end
+		accumulated_response = accumulated_response .. chunk
+		local lines = vim.split(accumulated_response, '\n', { plain = true })
+		for i, line in ipairs(lines) do
+			lines[i] = (i == 1) and '[assistant]: ' .. line or line
+		end
+		vim.api.nvim_buf_set_lines(temp_history_bufnr, assistant_start_line, -1, false, lines)
+		vim.api.nvim_win_set_cursor(chat_components.temp_history.winid, { vim.api.nvim_buf_line_count(temp_history_bufnr), 1 })
+	end, function(full_response)
+		if spinner_timer then
+			vim.fn.timer_stop(spinner_timer)
+			spinner_timer = nil
+		end
+		table.insert(chat_history, { role = 'assistant', content = full_response })
+		vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, { '---' })
+		vim.api.nvim_buf_set_lines(main_input_bufnr, 0, -1, false, {})
+		vim.api.nvim_win_set_cursor(chat_components.temp_history.winid, { vim.api.nvim_buf_line_count(temp_history_bufnr), 1 })
+	end)
 end
 
 function M.add()

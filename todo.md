@@ -18,6 +18,8 @@
    - bravesearch
    - context7
 - [x] nui.menu for ETSwitchModel
+- [x] animation when processing
+- [ ] markdown support in temp_history
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
     - check for updates (?)
     - ETBraveSearch
