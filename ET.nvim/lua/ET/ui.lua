@@ -282,7 +282,10 @@ function M.create_layout(width, height, boxes, direction)
 	return layout, components, boxes
 end
 
-function M.rebind_keymaps(components, boxes, layout)
+function M.rebind_keymaps(components, boxes, layout, opts)
+	opts = opts or {}
+	local on_submit = opts.on_submit
+
 	if not components or #components == 0 then
 		return
 	end
@@ -433,6 +436,11 @@ function M.rebind_keymaps(components, boxes, layout)
 		comp:map('n', '_', function()
 			resize_by(-5, 'vertical')
 		end, { noremap = true, nowait = true })
+		if on_submit then
+			comp:map('n', ':w<CR>', function()
+				on_submit()
+			end, { noremap = true })
+		end
 	end
 end
 
