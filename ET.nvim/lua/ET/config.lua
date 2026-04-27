@@ -87,7 +87,7 @@ function M.get_models()
 	end
 
 	local response = curl.get(url, {
-		timeout = 1000,
+		timeout = 10000,
 		headers = {
 			Authorization = 'Bearer ' .. cfg.api_key,
 			['Content-Type'] = 'application/json',

@@ -31,6 +31,9 @@ function M.init()
 				top_align = 'center',
 			},
 		},
+		win_options = {
+			relativenumber = true,
+		},
 	})
 
 	local main_input = Popup({
@@ -98,7 +101,26 @@ function M.open_chat()
 		M.init()
 	end
 	chat_ui:show()
-	ui.rebind_keymaps(layout_components, layout_boxes, chat_ui)
+
+	local temp_history_bufnr = chat_components.temp_history.bufnr
+	vim.api.nvim_buf_set_lines(temp_history_bufnr, 0, -1, false, {})
+
+	for _, msg in ipairs(chat_history) do
+		local lines = vim.split(msg.content, '\n', { plain = true })
+		for i, line in ipairs(lines) do
+			lines[i] = (i == 1) and '[' .. msg.role .. ']: ' .. line or line
+		end
+		vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, lines)
+		if msg.role == 'assistant' then
+			vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, { '---' })
+		end
+	end
+
+	ui.rebind_keymaps(layout_components, layout_boxes, chat_ui, {
+		on_submit = function()
+			M.prompt()
+		end,
+	})
 	vim.schedule(function()
 		if chat_components and chat_components.main_input then
 			vim.api.nvim_set_current_win(chat_components.main_input.winid)
@@ -107,7 +129,67 @@ function M.open_chat()
 end
 
 function M.prompt()
-	-- get contents from temp_history (if any) --> append with Input Popup
+	local temp_history_bufnr = chat_components.temp_history.bufnr
+	local main_input_bufnr = chat_components.main_input.bufnr
+
+	local input_lines = vim.api.nvim_buf_get_lines(main_input_bufnr, 0, -1, false)
+	if #input_lines == 0 then
+		return
+	end
+
+	local contents = {}
+	local temp_lines = vim.api.nvim_buf_get_lines(temp_history_bufnr, 0, -1, false)
+	local current_role = nil
+	for _, line in ipairs(temp_lines) do
+		if line == '---' then
+			current_role = nil
+		else
+			local role, rest = line:match('^%[([^%]]+)%]:%s*(.*)')
+			if role then
+				current_role = role
+				if rest and rest ~= '' then
+					table.insert(contents, { role = current_role, content = rest })
+				end
+			elseif current_role then
+				local existing = contents[#contents]
+				if existing and existing.role == current_role then
+					existing.content = existing.content .. '\n' .. line
+				else
+					table.insert(contents, { role = current_role, content = line })
+				end
+			end
+		end
+	end
+
+	local new_input = table.concat(input_lines, '\n')
+	table.insert(contents, { role = 'user', content = new_input })
+
+	chat_history = contents
+
+	local user_msg_lines = vim.split(new_input, '\n', { plain = true })
+	for i, line in ipairs(user_msg_lines) do
+		user_msg_lines[i] = (i == 1) and '[user]: ' .. line or line
+	end
+	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, user_msg_lines)
+
+	local response, err = config._prompt(chat_history)
+	if err then
+		vim.notify('ET.nvim: ' .. err, vim.log.levels.ERROR)
+		return
+	end
+
+	table.insert(chat_history, { role = 'assistant', content = response })
+
+	local response_lines = vim.split(response, '\n', { plain = true })
+	for i, line in ipairs(response_lines) do
+		response_lines[i] = (i == 1) and '[assistant]: ' .. line or line
+	end
+	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, response_lines)
+	vim.api.nvim_buf_set_lines(temp_history_bufnr, -1, -1, false, { '---' })
+
+	vim.api.nvim_buf_set_lines(main_input_bufnr, 0, -1, false, {})
+
+	return response
 end
 
 function M.add()
