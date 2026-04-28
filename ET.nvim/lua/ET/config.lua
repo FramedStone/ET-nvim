@@ -18,7 +18,7 @@ local config = {
 			reasoning_effort = vim.NIL,
 		},
 	},
-	system_prompt = '',
+	system_prompt = 'You are an agent that acts only through tools. You must respond only with a JSON tool call, with no text before or after.',
 }
 
 function M.get_config()
@@ -141,9 +141,13 @@ function M._prompt(contents, on_chunk, on_done)
 	end
 
 	local cmd = {
-		'curl', '-s', '-N',
-		'-X', 'POST',
-		'-H', 'Content-Type: application/json',
+		'curl',
+		'-s',
+		'-N',
+		'-X',
+		'POST',
+		'-H',
+		'Content-Type: application/json',
 	}
 	if cfg.api_key and cfg.api_key ~= '' then
 		table.insert(cmd, '-H')
