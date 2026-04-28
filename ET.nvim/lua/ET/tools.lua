@@ -81,17 +81,14 @@ end
 ---------------------------------- External Tools -----------------------------------------------
 function M.setup_external_tools()
 	if vim.fn.has('mac') then
-		-- bravesearch
-		-- https://github.com/brave/brave-search-cli
-
-		-- context7
-		-- https://github.com/upstash/context7/blob/master/skills/context7-cli/SKILL.md
+		-- Install bx (brave-search-cli), ctx7, jq
 		vim.cmd(
-			'terminal curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh && brew install ctx7'
+			'terminal curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh && brew install ctx7 jq'
 		)
 	else
+		-- Install bx, ctx7, jq (using chocolatey for jq)
 		vim.cmd(
-			'terminal powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.ps1 | iex; bun install ctx7"'
+			'terminal powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.ps1 | iex; choco install jq -y; bun install ctx7"'
 		)
 	end
 end
@@ -101,7 +98,7 @@ end
 --  news        News search — articles with freshness filters (pd/pw/pm/py or date range)
 --  images      Image search — thumbnails, sources, dimensions
 --  videos     Video search — titles, URLs, thumbnails, durations
-function M.use_brave_search(type, query_content)
+function M.use_brave_search(search_type, query_content, count)
 	local valid_types = {
 		web = true,
 		news = true,
@@ -109,18 +106,56 @@ function M.use_brave_search(type, query_content)
 		videos = true,
 	}
 
-	if not valid_types[type] then
-		error('Invalid type: ' .. type .. '. Must be one of: web, news, images, videos')
+	if not valid_types[search_type] then
+		error('Invalid search type: ' .. search_type .. '. Must be one of: web, news, images, videos')
 	end
 
-	local cmd = string.format('bx %s "%s"', type, query_content)
+	-- Check dependencies
+	if vim.fn.executable('bx') == 0 then
+		error('bx (Brave Search CLI) is not installed. Run :ETInstallTools')
+	end
+	if vim.fn.executable('jq') == 0 then
+		error('jq is not installed. Run :ETInstallTools')
+	end
+
+	count = count or 5
+	local query_escaped = vim.fn.shellescape(query_content)
+	local cmd_parts = { 'bx', search_type, query_escaped, '--count', tostring(count) }
+
+	-- Type-specific flags and jq filters
+	local jq_filter
+	if search_type == 'web' then
+		-- Only return web results, exclude news/videos/discussions
+		table.insert(cmd_parts, '--result-filter')
+		table.insert(cmd_parts, 'web')
+		jq_filter = '[.web.results[] | {title, url, description}]'
+	elseif search_type == 'news' then
+		jq_filter = '[.results[] | {title, url, age}]'
+	elseif search_type == 'images' then
+		jq_filter = '[.results[] | {title, url, thumbnail: .thumbnail.src}]'
+	elseif search_type == 'videos' then
+		jq_filter = '[.results[] | {title, url, duration: .video.duration}]'
+	end
+
+	local cmd = table.concat(cmd_parts, ' ') .. ' | jq -c ' .. vim.fn.shellescape(jq_filter)
 	local result = vim.fn.system(cmd)
 
 	if vim.v.shell_error ~= 0 then
 		error('BraveSearch failed: ' .. result)
 	end
 
-	return result
+	-- Parse jq output (single line JSON array)
+	result = result:gsub('^%s*(.-)%s*$', '%1') -- trim whitespace
+	if result == '' then
+		return {}
+	end
+
+	local ok, decoded = pcall(vim.fn.json_decode, result)
+	if not ok or type(decoded) ~= 'table' then
+		error('Failed to parse BraveSearch results: ' .. result)
+	end
+
+	return decoded
 end
 
 -- Context7

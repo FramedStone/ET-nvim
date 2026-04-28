@@ -45,7 +45,14 @@ function M.create_menu(title, items, on_submit, width, height)
 				})
 			)
 		else
-			table.insert(menu_items, Menu.item(item.text))
+			-- Preserve custom fields (e.g., _res) by passing them to Menu.item
+			local item_data = { text = item.text }
+			for k, v in pairs(item) do
+				if k ~= 'text' and k ~= 'separator' then
+					item_data[k] = v
+				end
+			end
+			table.insert(menu_items, Menu.item(item.text, item_data))
 		end
 	end
 
@@ -73,7 +80,7 @@ function M.create_menu(title, items, on_submit, width, height)
 		on_close = function() end,
 		on_submit = function(item)
 			if on_submit then
-				on_submit(item.text)
+				on_submit(item)
 			end
 		end,
 	})
