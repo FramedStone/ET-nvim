@@ -19,8 +19,9 @@
    - context7
 - [x] nui.menu for ETSwitchModel
 - [x] animation when processing
-- [ ] refactor ui
+- [x] refactor ui
 - [ ] ETBraveSearch & ETContext7 with input + popup 
+    - use jq to populate it
     - inject into agent's memory via system prompt
 - [ ] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
