@@ -18,6 +18,7 @@ local config = {
 			reasoning_effort = vim.NIL,
 		},
 	},
+	system_prompt = '',
 }
 
 function M.get_config()
@@ -56,6 +57,8 @@ function M.set_config(cfg)
 	local p = ui.create_popup('Edit Settings', 60, height)
 
 	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
+
+	vim.api.nvim_buf_set_option(p.bufnr, 'relativenumber', true)
 
 	local function save_and_close()
 		local lines = vim.api.nvim_buf_get_lines(p.bufnr, 0, -1, false)
@@ -121,6 +124,10 @@ function M._prompt(contents, on_chunk, on_done)
 		table.insert(messages, { role = 'user', content = contents })
 	elseif type(contents) == 'table' then
 		messages = contents
+	end
+
+	if cfg.system_prompt and cfg.system_prompt ~= '' then
+		table.insert(messages, 1, { role = 'system', content = cfg.system_prompt })
 	end
 
 	local payload = {
