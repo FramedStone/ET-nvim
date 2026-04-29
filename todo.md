@@ -20,6 +20,7 @@
 - [x] nui.menu for ETSwitchModel
 - [x] animation when processing
 - [x] refactor ui
+- [x] UI component responsiveness (grow and shrink)
 - [ ] ETBraveSearch & ETContext7 with input + popup 
     - use jq to populate it
     - inject into agent's memory via system prompt

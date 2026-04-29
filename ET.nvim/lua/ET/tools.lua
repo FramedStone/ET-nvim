@@ -128,7 +128,7 @@ function M.use_brave_search(search_type, query_content, count)
 		-- Only return web results, exclude news/videos/discussions
 		table.insert(cmd_parts, '--result-filter')
 		table.insert(cmd_parts, 'web')
-		jq_filter = '[.web.results[] | {title, url, description}]'
+		jq_filter = '[.web.results[] | {title, url}]'
 	elseif search_type == 'news' then
 		jq_filter = '[.results[] | {title, url, age}]'
 	elseif search_type == 'images' then
