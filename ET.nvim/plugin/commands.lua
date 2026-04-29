@@ -135,7 +135,14 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 			local result_items = {}
 			for _, res in ipairs(results) do
 				local title = res.title or 'No title'
-				table.insert(result_items, Menu.item(title, { _res = res }))
+				-- For images/videos, override url with thumbnail src
+				local result_copy = vim.tbl_deep_extend('force', {}, res)
+				if selected_type == 'images' and result_copy.thumbnail then
+					result_copy.url = result_copy.thumbnail
+				elseif selected_type == 'videos' and result_copy.thumbnail then
+					result_copy.url = result_copy.thumbnail
+				end
+				table.insert(result_items, Menu.item(title, { _res = result_copy }))
 			end
 
 			-- Update menu dynamically (same menu, no unmount/remount)
