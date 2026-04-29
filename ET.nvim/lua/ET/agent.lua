@@ -19,7 +19,7 @@ end
 
 function M.open_chat()
 	if not chat_popup then
-		chat_popup = ui.create_popup('', 50, 10)
+		chat_popup = ui.create_popup('', '80%', '70%')
 	end
 	chat_popup:mount()
 	vim.schedule(function()

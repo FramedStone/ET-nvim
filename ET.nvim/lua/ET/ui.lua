@@ -2,10 +2,46 @@ local M = {}
 local Layout = require('nui.layout')
 local Popup = require('nui.popup')
 local Menu = require('nui.menu')
+local event = require('nui.utils.autocmd').event
+
+-- Track active components for VimResized auto-resize
+M._active_components = {}
+
+local function register_component(component)
+	M._active_components[component] = true
+end
+
+local function unregister_component(component)
+	M._active_components[component] = nil
+end
+
+-- Auto-resize all active components on terminal resize
+vim.api.nvim_create_autocmd('VimResized', {
+	callback = function()
+		for comp, _ in pairs(M._active_components) do
+			-- Layout has is_mounted(), Popup has winid
+			local is_valid = false
+			if comp.is_mounted then
+				is_valid = comp:is_mounted()
+			elseif comp.winid then
+				is_valid = vim.api.nvim_win_is_valid(comp.winid)
+			end
+
+			if is_valid then
+				local ok, _ = pcall(comp.update_layout, comp)
+				if not ok then
+					unregister_component(comp)
+				end
+			else
+				unregister_component(comp)
+			end
+		end
+	end,
+})
 
 function M.create_popup(title, width, height)
-	width = width or 50
-	height = height or 10
+	width = width or '80%'
+	height = height or '70%'
 
 	local popup = Popup({
 		enter = true,
@@ -13,7 +49,7 @@ function M.create_popup(title, width, height)
 		position = '50%',
 		size = { width = width, height = height },
 		border = {
-			style = 'single',
+			style = 'rounded',
 			text = {
 				top = title,
 				top_align = 'left',
@@ -27,12 +63,18 @@ function M.create_popup(title, width, height)
 	})
 
 	popup:mount()
+	register_component(popup)
+
+	popup:on(event.BufLeave, function()
+		unregister_component(popup)
+	end, { once = true })
+
 	return popup
 end
 
 function M.create_menu(title, items, on_submit, width, height)
-	width = width or 50
-	height = height or 5
+	width = width or '50%'
+	height = height or '40%'
 
 	local menu_items = {}
 	for _, item in ipairs(items) do
@@ -60,7 +102,7 @@ function M.create_menu(title, items, on_submit, width, height)
 		position = '50%',
 		size = { width = width, height = height },
 		border = {
-			style = 'single',
+			style = 'rounded',
 			text = {
 				top = title,
 				top_align = 'center',
@@ -86,18 +128,24 @@ function M.create_menu(title, items, on_submit, width, height)
 	})
 
 	menu:mount()
+	register_component(menu)
+
+	menu:on(event.BufLeave, function()
+		unregister_component(menu)
+	end, { once = true })
+
 	return menu
 end
 
 --- Creates a layout with multiple nui components arranged vertically.
---- @param width? number layout width (default: 80)
---- @param height? number layout height (default: 40)
+--- @param width? number|string layout width (default: '90%')
+--- @param height? number|string layout height (default: '85%')
 --- @param boxes {component: any, size?: number, initial_focus?: boolean}[] array of {component, size} where size is percentage
 --- @param direction? string 'col' or 'row'
 --- @return nui.layout
 function M.create_layout(width, height, boxes, direction)
-	width = width or 80
-	height = height or 40
+	width = width or '90%'
+	height = height or '85%'
 
 	local function build_boxes(box_configs)
 		local box_children = {}
@@ -161,6 +209,8 @@ function M.create_layout(width, height, boxes, direction)
 	end
 
 	layout:mount()
+	register_component(layout)
+
 	local function find_initial_focus(box_list)
 		for _, box in ipairs(box_list) do
 			if box.initial_focus and box.component and box.component.winid then
