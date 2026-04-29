@@ -25,8 +25,7 @@
     - use jq to populate it
     - inject into agent's memory via system prompt
 - [ ] ETAddToSystemPrompt, ETAddToPrompt
-- [ ] display image & video within the result menu UI (results json, results.image (?))
-- [ ] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
+- [x] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
     - check for updates (ETKnowledgeSync)
 - [ ] wire file picker and range selector into ET
