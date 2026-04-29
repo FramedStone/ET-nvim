@@ -134,7 +134,7 @@ function M.use_brave_search(search_type, query_content, count)
 	elseif search_type == 'images' then
 		jq_filter = '[.results[] | {title, url, thumbnail: .thumbnail.src}]'
 	elseif search_type == 'videos' then
-		jq_filter = '[.results[] | {title, url, duration: .video.duration}]'
+		jq_filter = '[.results[] | {title, url, duration: .video.duration, thumbnail: .thumbnail}]'
 	end
 
 	local cmd = table.concat(cmd_parts, ' ') .. ' | jq -c ' .. vim.fn.shellescape(jq_filter)
