@@ -54,7 +54,7 @@ function M.set_config(cfg)
 	local formatted = vim.fn.readfile(temp)
 	local height = #formatted
 
-	local p = ui.create_popup('Edit Settings', 60, height)
+	local p = ui.create_popup('Edit Settings', '60%', height)
 
 	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
 
