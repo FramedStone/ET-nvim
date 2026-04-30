@@ -2,6 +2,8 @@ local M = {}
 local Layout = require('nui.layout')
 local Popup = require('nui.popup')
 local Menu = require('nui.menu')
+local Tree = require('nui.tree')
+local Line = require('nui.line')
 local event = require('nui.utils.autocmd').event
 
 -- Track active components for VimResized auto-resize
@@ -147,40 +149,29 @@ function M.create_layout(width, height, boxes, direction)
 	width = width or '90%'
 	height = height or '85%'
 
-	local function build_boxes(box_configs)
+	local function build_boxes_impl(box_configs)
 		local box_children = {}
 		local components = {}
 		for _, box_config in ipairs(box_configs) do
+			local size = box_config.size or math.floor(100 / #box_configs)
+			size = type(size) == 'number' and size .. '%' or size
 			if box_config.dir then
-				local children = {}
-				local child_components = {}
-				for i, child in ipairs(box_config) do
-					if type(child) == 'table' and child.component then
-						local component = child.component
-						local size = child.size or math.floor(100 / #box_config)
-						size = type(size) == 'number' and size .. '%' or size
-						table.insert(children, Layout.Box(component, { size = size }))
-						table.insert(child_components, component)
-					end
-				end
-				for _, c in ipairs(child_components) do
+				local sub_children, sub_components = build_boxes_impl(box_config)
+				for _, c in ipairs(sub_components) do
 					table.insert(components, c)
 				end
-				local size = box_config.size or math.floor(100 / #box_configs)
-				size = type(size) == 'number' and size .. '%' or size
-				table.insert(box_children, Layout.Box(children, { dir = box_config.dir, size = size }))
-			else
-				local component = box_config.component
-				local size = box_config.size or math.floor(100 / #box_configs)
-				size = type(size) == 'number' and size .. '%' or size
-				table.insert(box_children, Layout.Box(component, { size = size }))
-				table.insert(components, component)
+				table.insert(box_children, Layout.Box(sub_children, { dir = box_config.dir, size = size }))
+			elseif box_config.component then
+				table.insert(box_children, Layout.Box(box_config.component, { size = size }))
+				if box_config.focusable ~= false then
+					table.insert(components, box_config.component)
+				end
 			end
 		end
 		return box_children, components
 	end
 
-	local box_children, components = build_boxes(boxes)
+	local box_children, components = build_boxes_impl(boxes)
 
 	local layout = Layout({
 		position = '50%',
@@ -241,6 +232,99 @@ function M.create_layout(width, height, boxes, direction)
 	vim.defer_fn(set_initial_focus, 0)
 
 	return layout, components, boxes
+end
+
+--- Creates a NuiTree on a popup's buffer with default node rendering and keymaps.
+--- @param popup table the nui Popup instance to render the tree into
+--- @param placeholder string text shown before results are loaded
+--- @param opts? table optional config
+--- @param opts.prepare_node? fun(node: any): any custom node formatter
+--- @param opts.keymaps? table<string, function|false> key overrides (false to disable)
+--- @return NuiTree, table (tree, popup)
+function M.create_tree(popup, placeholder, opts)
+	opts = opts or {}
+
+	local prepare_node = opts.prepare_node or function(node)
+		local line = Line()
+		if node:has_children() then
+			local icon = node:is_expanded() and '  ' or '  '
+			line:append(icon, 'SpecialChar')
+			line:append(node.text, 'Title')
+		elseif node._is_child then
+			if node._url then
+				line:append(node.text, 'Comment')
+			else
+				line:append(node.text, 'Normal')
+			end
+		else
+			line:append(node.text)
+		end
+		return line
+	end
+
+	local tree = Tree({
+		bufnr = popup.bufnr,
+		nodes = { Tree.Node({ text = placeholder }) },
+		prepare_node = prepare_node,
+	})
+
+	local keymaps = opts.keymaps or {}
+
+	if keymaps.h ~= false then
+		local handler = keymaps.h or function()
+			local node = tree:get_node()
+			if node and node:has_children() and node:is_expanded() then
+				node:collapse()
+				tree:render()
+			end
+		end
+		popup:map('n', 'h', handler, { noremap = true, nowait = true })
+	end
+
+	if keymaps.l ~= false then
+		local handler = keymaps.l or function()
+			local node = tree:get_node()
+			if node and node:has_children() and not node:is_expanded() then
+				node:expand()
+				tree:render()
+			end
+		end
+		popup:map('n', 'l', handler, { noremap = true, nowait = true })
+	end
+
+	if keymaps.j ~= false then
+		local handler = keymaps.j or 'j'
+		popup:map('n', 'j', handler, { noremap = true, nowait = true })
+	end
+
+	if keymaps.k ~= false then
+		local handler = keymaps.k or 'k'
+		popup:map('n', 'k', handler, { noremap = true, nowait = true })
+	end
+
+	if keymaps['<CR>'] ~= false then
+		local handler = keymaps['<CR>'] or function()
+			local node = tree:get_node()
+			if node and node:has_children() then
+				if node:is_expanded() then
+					node:collapse()
+				else
+					node:expand()
+				end
+				tree:render()
+			end
+		end
+		popup:map('n', '<CR>', handler, { noremap = true, nowait = true })
+	end
+
+	if keymaps['<Esc>'] ~= false then
+		local handler = keymaps['<Esc>'] or function() end
+		popup:map('n', '<Esc>', handler, { noremap = true, nowait = true })
+	end
+
+	tree:render()
+
+	return tree, popup
 end
 
 return M
