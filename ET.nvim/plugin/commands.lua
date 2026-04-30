@@ -6,8 +6,6 @@ local Popup = require('nui.popup')
 local Menu = require('nui.menu')
 local Input = require('nui.input')
 local Tree = require('nui.tree')
-local Line = require('nui.line')
-local Text = require('nui.text')
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
 	local models = config.get_models()
@@ -203,96 +201,32 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 			return
 		end
 
-		-- Create initial tree with placeholder message
-		result_tree = Tree({
-			bufnr = bravesearch_result_popup.bufnr,
-			nodes = {
-				Tree.Node({ text = 'Enter query and press :w<CR> to search' }),
-			},
-			prepare_node = function(node)
-				local line = Line()
-
-				if node:has_children() then
-					-- Parent node: show expand/collapse indicator + title
-					local icon = node:is_expanded() and '  ' or '  '
-					line:append(icon, 'SpecialChar')
-					line:append(node.text, 'Title')
-				elseif node._is_child then
-					-- Child node: indented description or URL
-					if node._url then
-						line:append(node.text, 'Comment')
-					else
-						line:append(node.text, 'Normal')
+		result_tree = ui.create_tree(bravesearch_result_popup, 'Enter query and press :w<CR> to search', {
+			keymaps = {
+				['<CR>'] = function()
+					if not result_tree then
+						return
 					end
-				else
-					-- Simple text node (loading, error, placeholder)
-					line:append(node.text)
-				end
-
-				return line
-			end,
+					local node = result_tree:get_node()
+					if not node then
+						return
+					end
+					if node._res and node._res.url then
+						vim.ui.open(node._res.url)
+					elseif node._url then
+						vim.ui.open(node._url)
+					elseif node:has_children() then
+						if node:is_expanded() then
+							node:collapse()
+						else
+							node:expand()
+						end
+						result_tree:render()
+					end
+				end,
+				['<Esc>'] = function() end,
+			},
 		})
-		result_tree:render()
-
-		-- Map <CR> to open URL from selected node
-		bravesearch_result_popup:map('n', '<CR>', function()
-			if not result_tree then
-				return
-			end
-			local node = result_tree:get_node()
-			if not node then
-				return
-			end
-
-			-- If it's a parent node with _res, open its URL
-			if node._res and node._res.url then
-				vim.ui.open(node._res.url)
-			-- If it's a child URL node, open its URL
-			elseif node._url then
-				vim.ui.open(node._url)
-			-- If it's a parent with children, toggle expand/collapse
-			elseif node:has_children() then
-				if node:is_expanded() then
-					node:collapse()
-				else
-					node:expand()
-				end
-				result_tree:render()
-			end
-		end, { noremap = true, nowait = true })
-
-		-- Map <Esc> to do nothing (prevent popup from closing and breaking layout)
-		bravesearch_result_popup:map('n', '<Esc>', function()
-			-- Do nothing - keep popup open
-		end, { noremap = true, nowait = true })
-
-		-- Map l to expand node
-		bravesearch_result_popup:map('n', 'l', function()
-			if not result_tree then
-				return
-			end
-			local node = result_tree:get_node()
-			if node and node:has_children() and not node:is_expanded() then
-				node:expand()
-				result_tree:render()
-			end
-		end, { noremap = true, nowait = true })
-
-		-- Map h to collapse node
-		bravesearch_result_popup:map('n', 'h', function()
-			if not result_tree then
-				return
-			end
-			local node = result_tree:get_node()
-			if node and node:has_children() and node:is_expanded() then
-				node:collapse()
-				result_tree:render()
-			end
-		end, { noremap = true, nowait = true })
-
-		-- Map j/k for navigation (using native cursor movement)
-		bravesearch_result_popup:map('n', 'j', 'j', { noremap = true, nowait = true })
-		bravesearch_result_popup:map('n', 'k', 'k', { noremap = true, nowait = true })
 	end, 100)
 
 	-- Layout (handles mounting all components)
@@ -313,68 +247,103 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 end, { desc = 'Brave Search' })
 
 vim.api.nvim_create_user_command('ETContext7', function()
-	ui.create_menu('Context7', {
-		{ text = 'library' },
-		{ text = 'docs' },
-	}, function(selected)
-		local selected_text = type(selected) == 'table' and selected.text or selected
-		if selected_text == 'library' then
-			vim.defer_fn(function()
-				local popup = Popup({
-					position = '50%',
-					size = { width = '60%', height = '40%' },
-					enter = true,
-					border = {
-						style = 'rounded',
-						text = {
-							top = '[Library Search]',
-						},
-					},
-					buf_options = {
-						buftype = '',
-						modifiable = true,
-						readonly = false,
-					},
-				})
-				popup:mount()
-			end, 0)
-		elseif selected_text == 'docs' then
-			vim.defer_fn(function()
-				local context_docs_library = Popup({
-					border = {
-						style = 'rounded',
-						text = {
-							top = 'Context Docs Library',
-						},
-					},
-					buf_options = {
-						buftype = '',
-						modifiable = true,
-						readonly = false,
-					},
-				})
+	local library_result_tree = nil
+	local docs_result_tree = nil
 
-				local context_docs_input = Popup({
-					border = {
-						style = 'rounded',
-						text = {
-							top = 'Context Docs Input',
-						},
-					},
-					buf_options = {
-						buftype = '',
-						modifiable = true,
-						readonly = false,
-					},
-				})
+	-- Left panel: library search results
+	local context7_library_result = Popup({
+		border = { style = 'rounded', text = { top = 'Library Results' } },
+		win_options = {
+			winhighlight = 'Normal:Normal,FloatBorder:Normal,CursorLine:Visual',
+			cursorline = true,
+		},
+		buf_options = { readonly = true, modifiable = false },
+	})
 
-				ui.create_layout('90%', '85%', {
-					{ component = context_docs_library, size = 50 },
-					{ component = context_docs_input, size = 50 },
-				}, 'col')
-			end, 0)
+	-- Left bottom: library search input
+	local context7_library_input = Popup({
+		border = { style = 'rounded', text = { top = '[Library]' } },
+		buf_options = { modifiable = true, readonly = false },
+	})
+
+	-- Arrow separator popup
+	local context7_arrow = Popup({
+		focusable = false,
+		border = { style = 'none' },
+		buf_options = { modifiable = true, readonly = false },
+		win_options = {
+			winhighlight = 'Normal:Normal,FloatBorder:Normal',
+		},
+	})
+
+	-- Right panel: docs search results
+	local context7_docs_result = Popup({
+		border = { style = 'rounded', text = { top = 'Docs Results' } },
+		win_options = {
+			winhighlight = 'Normal:Normal,FloatBorder:Normal,CursorLine:Visual',
+			cursorline = true,
+		},
+		buf_options = { readonly = true, modifiable = false },
+	})
+
+	-- Right bottom left: docs library input
+	local context7_docs_library_input = Popup({
+		border = { style = 'rounded', text = { top = '[Library]' } },
+		buf_options = { modifiable = true, readonly = false },
+	})
+
+	-- Right bottom right: docs query input
+	local context7_docs_input = Popup({
+		border = { style = 'rounded', text = { top = '[Query]' } },
+		buf_options = { modifiable = true, readonly = false },
+	})
+
+	-- Build layout with create_layout (supports nested dir groups + TAB/S-TAB)
+	local _, components = ui.create_layout('90%', '85%', {
+		{
+			dir = 'col',
+			size = 49,
+			{ component = context7_library_result, size = 90 },
+			{ component = context7_library_input, size = 10, initial_focus = true },
+		},
+		{ component = context7_arrow, size = 2, focusable = false },
+		{
+			dir = 'col',
+			size = 49,
+			{ component = context7_docs_result, size = 90 },
+			{
+				dir = 'row',
+				size = 10,
+				{ component = context7_docs_library_input, size = 50 },
+				{ component = context7_docs_input, size = 50 },
+			},
+		},
+	}, 'row')
+
+	-- Set arrow content after mount
+	vim.defer_fn(function()
+		if context7_arrow.winid then
+			local arrow_h = vim.api.nvim_win_get_height(context7_arrow.winid)
+			local arrow_w = vim.api.nvim_win_get_width(context7_arrow.winid)
+			local mid = math.floor(arrow_h / 2) + 1
+			local pad = string.rep(' ', math.floor(arrow_w / 2))
+			local lines = {}
+			for i = 1, arrow_h do
+				lines[i] = i == mid and (pad .. '→') or ''
+			end
+			vim.api.nvim_buf_set_lines(context7_arrow.bufnr, 0, -1, false, lines)
 		end
-	end, 20, 3)
+	end, 50)
+
+	-- Initialize trees after mount
+	vim.defer_fn(function()
+		if not context7_library_result.winid or not context7_docs_result.winid then
+			return
+		end
+
+		library_result_tree = ui.create_tree(context7_library_result, 'Search for a library to get started')
+		docs_result_tree = ui.create_tree(context7_docs_result, 'Search for docs to get started')
+	end, 100)
 end, { desc = 'Context7' })
 
 vim.api.nvim_create_user_command('ETInstallTools', function()

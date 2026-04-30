@@ -36,3 +36,5 @@
 - [ ] quickfix integration
 - [ ] diagnosis integration
 - [ ] nvim extended tools (e.g. func definition, symbols, func implementation)
+- [ ] diagnosis integration
+- [ ] agent swarm with tdd
