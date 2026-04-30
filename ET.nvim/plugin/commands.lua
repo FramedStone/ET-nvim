@@ -167,6 +167,7 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 			relative = 'cursor',
 			position = { row = 1, col = 0 },
 			size = 25,
+			zindex = 200,
 			border = {
 				style = 'rounded',
 				text = { top = '[Result Count]', top_align = 'left' },
