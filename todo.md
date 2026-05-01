@@ -21,14 +21,18 @@
 - [x] animation when processing
 - [x] refactor ui
 - [x] UI component responsiveness (grow and shrink)
-- [ ] ETBraveSearch & ETContext7 with input + popup 
+- [x] ETBraveSearch & ETContext7 with input + popup 
     - use jq to populate it
     - inject into agent's memory via system prompt
+- [ ] Add states module for the states, and refactor ui from commands module
+    - add code snippets into states 
 - [ ] ETAddToSystemPrompt, ETAddToPrompt
+    - persistent system prompt based on project/codebase path
 - [x] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
     - check for updates (ETKnowledgeSync)
 - [ ] wire file picker and range selector into ET
+- [ ] wire nvim tools
 - [ ] pr flow for any edits
     - [ ] vimdiff
     - [ ] using jq for tools result cherry picking

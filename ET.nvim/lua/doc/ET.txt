@@ -4,3 +4,18 @@ Dependencies Plugins
 
 Formatter
 1. fixjson
+
+External Tools
+1. bx       - Brave Search CLI (web/news/images/videos search)
+2. ctx7     - Context7 CLI (library documentation lookup)
+3. jq       - JSON processor (used for Brave Search result filtering)
+
+Context7 Notes
+- ctx7 library does not support a result count parameter (unlike bx --count).
+  ET.nvim prunes results client-side via a count input prompt after search.
+- ctx7 library's optional query field (second positional argument) is used for
+  relevance ranking but is not exposed in the current plugin UI. The plugin
+  passes the user's input as the library name only.
+- ctx7 docs --research mode is not used. It requires a Context7 API key
+  (10 runs/week free, 100/week Pro, 300/week Enterprise). The regular mode
+  works without an API key and is sufficient for most use cases.
