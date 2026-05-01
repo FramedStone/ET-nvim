@@ -160,31 +160,50 @@ end
 
 -- Context7
 -- # Query library documentation
--- ctx7 library react "how to use hooks"
--- ctx7 docs /facebook/react "useEffect examples"
-function M.use_context7(type, query_content)
+-- ctx7 library --json "react"
+-- ctx7 docs --json /facebook/react "useEffect examples"
+function M.use_context7(ctx7_type, query_content, library_id)
 	local valid_types = {
 		library = true,
 		docs = true,
-		skills = {
-			search = false,
-			install = false,
-			list = false,
-			remove = false,
-		},
 	}
 
-	if not valid_types[type] then
-		error('Invalid type: ' .. type .. '. Must be one of: library, docs')
+	if not valid_types[ctx7_type] then
+		error('Invalid type: ' .. ctx7_type .. '. Must be one of: library, docs')
 	end
 
-	local cmd = string.format('ctx7 %s "%s"', type, query_content)
+	if vim.fn.executable('ctx7') == 0 then
+		error('ctx7 is not installed. Run :ETInstallTools')
+	end
+
+	local cmd
+	if ctx7_type == 'docs' then
+		if not library_id or library_id == '' then
+			error('library_id is required for docs type')
+		end
+		local lib_escaped = vim.fn.shellescape(library_id)
+		local query_escaped = vim.fn.shellescape(query_content)
+		cmd = string.format('ctx7 docs --json %s %s', lib_escaped, query_escaped)
+	else
+		local query_escaped = vim.fn.shellescape(query_content)
+		cmd = string.format('ctx7 library --json %s', query_escaped)
+	end
 	local result = vim.fn.system(cmd)
 
 	if vim.v.shell_error ~= 0 then
 		error('Context7 failed: ' .. result)
 	end
 
-	return result
+	result = result:gsub('^%s*(.-)%s*$', '%1')
+	if result == '' then
+		return {}
+	end
+
+	local ok, decoded = pcall(vim.fn.json_decode, result)
+	if not ok or type(decoded) ~= 'table' then
+		error('Failed to parse Context7 results: ' .. result)
+	end
+
+	return decoded
 end
 return M
