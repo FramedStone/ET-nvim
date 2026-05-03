@@ -2,20 +2,11 @@ local agent = require('ET.agent')
 local config = require('ET.config')
 local ui = require('ET.ui')
 local tools = require('ET.tools')
+local states = require('ET.states')
 local Popup = require('nui.popup')
 local Menu = require('nui.menu')
 local Input = require('nui.input')
 local Tree = require('nui.tree')
-
--- Shared state for ETContext7 commands
-local ctx7_state = {
-	library_result_tree = nil,
-	docs_library_input = nil,
-	docs_result_tree = nil,
-	docs_input = nil,
-	docs_code_snippets = {},
-	docs_info_snippets = {},
-}
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
 	local models = config.get_models()
@@ -39,12 +30,23 @@ vim.api.nvim_create_user_command('ETEditSettings', function()
 end, { desc = 'Edit ET configuration' })
 
 vim.api.nvim_create_user_command('ETFilePicker', function()
-	tools.select_files()
-end, { desc = '' })
+	local win = vim.api.nvim_get_current_win()
+	local buf = vim.api.nvim_win_get_buf(win)
+	tools.select_files(function(paths)
+		if vim.api.nvim_buf_is_valid(buf) then
+			vim.api.nvim_buf_set_lines(buf, -1, -1, false, paths)
+		end
+	end)
+end, { desc = 'Pick files and insert into current buffer' })
 
 vim.api.nvim_create_user_command('ET', function(opts)
-	tools.select_line_of_codes(opts)
-	agent.open_chat()
+	local popup = agent.open_chat()
+	if opts.range > 0 then
+		local out = tools.select_line_of_codes(opts)
+		if out and popup and popup.bufnr then
+			vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, { out })
+		end
+	end
 end, { range = true, desc = 'Open ET Chat' })
 
 vim.api.nvim_create_user_command('ETBraveSearch', function()
@@ -79,6 +81,7 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 		on_change = function(item, menu)
 			if item and item.text then
 				selected_type = item.text
+				states.bravesearch.selected_type = item.text
 			end
 		end,
 	})
@@ -157,8 +160,9 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 				end
 			end
 
-			-- Store full results on popup for future cherry-picking
+			-- Store full results for future reference
 			bravesearch_result_popup._search_results = results
+			states.set_bravesearch_results(results)
 		end, 0)
 	end
 
@@ -237,6 +241,10 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 				['<Esc>'] = function() end,
 			},
 		})
+
+		-- Store bravesearch UI references in states
+		states.ui.bravesearch_result_popup = bravesearch_result_popup
+		states.ui.bravesearch_result_tree = result_tree
 	end, 100)
 
 	-- Layout (handles mounting all components)
@@ -371,6 +379,9 @@ vim.api.nvim_create_user_command('ETContext7', function()
 				table.insert(pruned, filtered[i])
 			end
 
+			-- Store library results in state
+			states.context7.library_results = pruned
+
 			-- Build tree nodes
 			local nodes = {}
 			for i, lib in ipairs(pruned) do
@@ -380,7 +391,7 @@ vim.api.nvim_create_user_command('ETContext7', function()
 					Tree.Node({ id = 'stars-' .. i, text = '  stars: ' .. tostring(lib.stars or 0), _is_child = true }),
 					Tree.Node({ id = 'branch-' .. i, text = '  branch: ' .. (lib.branch or ''), _is_child = true }),
 				}
-				local node = Tree.Node({ id = 'lib-' .. i, text = i .. '. ' .. (lib.id or ''), _lib_id = lib.id }, children)
+				local node = Tree.Node({ id = 'lib-' .. i, text = i .. '. ' .. (lib.id or ''), _lib_id = lib.id, _res = lib }, children)
 				node:expand()
 				table.insert(nodes, node)
 				table.insert(nodes, Tree.Node({ id = 'sep-' .. i, text = '', _is_separator = true }))
@@ -481,15 +492,14 @@ vim.api.nvim_create_user_command('ETContext7', function()
 					Tree.Node({ id = 'lang-' .. i, text = '  codeLanguage: ' .. (snippet.codeLanguage or ''), _is_child = true }),
 					Tree.Node({ id = 'id-' .. i, text = '  codeId: ' .. (snippet.codeId or ''), _is_child = true, _url = snippet.codeId }),
 				}
-				local node = Tree.Node({ id = 'doc-' .. i, text = i .. '. ' .. (snippet.codeTitle or ''), _url = snippet.codeId }, children)
+				local node = Tree.Node({ id = 'doc-' .. i, text = i .. '. ' .. (snippet.codeTitle or ''), _url = snippet.codeId, _res = snippet }, children)
 				node:expand()
 				table.insert(nodes, node)
 				table.insert(nodes, Tree.Node({ id = 'sep-' .. i, text = '', _is_separator = true }))
 			end
 
 			-- Store codeList and infoSnippets in state
-			ctx7_state.docs_code_snippets = pruned
-			ctx7_state.docs_info_snippets = results.infoSnippets or {}
+			states.set_context7_docs(pruned, results.infoSnippets or {})
 
 			if docs_result_tree then
 				docs_result_tree:set_nodes(nodes)
@@ -577,10 +587,10 @@ vim.api.nvim_create_user_command('ETContext7', function()
 		docs_result_tree = ui.create_tree(context7_docs_result, 'Search for docs to get started')
 
 		-- Store references for ETContext7AddToDocs
-		ctx7_state.library_result_tree = library_result_tree
-		ctx7_state.docs_library_input = context7_docs_library_input
-		ctx7_state.docs_result_tree = docs_result_tree
-		ctx7_state.docs_input = context7_docs_input
+		states.ui.library_result_tree = library_result_tree
+		states.ui.docs_library_input = context7_docs_library_input
+		states.ui.docs_result_tree = docs_result_tree
+		states.ui.docs_input = context7_docs_input
 
 		-- Map :w<CR> on left-side components for library search
 		context7_library_input:map('n', ':w<CR>', execute_library_search, { noremap = true, nowait = true })
@@ -638,12 +648,12 @@ vim.api.nvim_create_user_command('ETContext7', function()
 end, { desc = 'Context7' })
 
 vim.api.nvim_create_user_command('ETContext7AddToDocs', function()
-	if not ctx7_state.library_result_tree or not ctx7_state.docs_library_input then
+	if not states.ui.library_result_tree or not states.ui.docs_library_input then
 		vim.notify('ETContext7AddToDocs: Open ETContext7 first', vim.log.levels.WARN)
 		return
 	end
 
-	local tree = ctx7_state.library_result_tree
+	local tree = states.ui.library_result_tree
 	local node = tree:get_node()
 	if not node then
 		vim.notify('ETContext7AddToDocs: No result selected', vim.log.levels.WARN)
@@ -656,7 +666,7 @@ vim.api.nvim_create_user_command('ETContext7AddToDocs', function()
 		return
 	end
 
-	local input = ctx7_state.docs_library_input
+	local input = states.ui.docs_library_input
 	if not input.winid then
 		vim.notify('ETContext7AddToDocs: Docs library input not available', vim.log.levels.WARN)
 		return
@@ -665,10 +675,217 @@ vim.api.nvim_create_user_command('ETContext7AddToDocs', function()
 	vim.api.nvim_buf_set_lines(input.bufnr, 0, -1, false, { lib_id })
 
 	-- Focus docs query input
-	if ctx7_state.docs_input and ctx7_state.docs_input.winid then
-		vim.api.nvim_set_current_win(ctx7_state.docs_input.winid)
+	if states.ui.docs_input and states.ui.docs_input.winid then
+		vim.api.nvim_set_current_win(states.ui.docs_input.winid)
 	end
 end, { desc = 'Add selected library to docs input' })
+
+-- Helper: open review popup for adding to system prompt or prompt context
+local function open_review_popup(text, mode)
+	-- Pretty-print JSON through jq
+	local formatted = text
+	local ok, result = pcall(function()
+		local tmpfile = vim.fn.tempname()
+		vim.fn.writefile({ text }, tmpfile)
+		local out = vim.fn.system('jq "." ' .. vim.fn.shellescape(tmpfile))
+		vim.fn.delete(tmpfile)
+		if vim.v.shell_error == 0 then
+			return out
+		end
+		error('jq failed')
+	end)
+	if ok then
+		formatted = result
+	end
+
+	local popup = Popup({
+		enter = true,
+		focusable = true,
+		position = '50%',
+		zindex = 200,
+		size = { width = '70%', height = '50%' },
+		border = {
+			style = 'rounded',
+			text = {
+				top = mode == 'system' and '[Add to System Prompt]' or '[Add to Prompt]',
+				top_align = 'left',
+			},
+		},
+		buf_options = {
+			modifiable = true,
+			readonly = false,
+		},
+		win_options = {
+			relativenumber = true,
+		},
+	})
+
+	popup:mount()
+	vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, vim.split(formatted, '\n'))
+
+	local function save_and_close()
+		local lines = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
+		local content = table.concat(lines, '\n'):gsub('^%s*(.-)%s*$', '%1')
+		if content ~= '' then
+			if mode == 'system' then
+				states.add_to_system_prompt(content)
+				vim.notify('ET.nvim: Added to system prompt')
+			else
+				agent.add(content)
+				vim.notify('ET.nvim: Added to prompt context')
+			end
+		end
+		popup:unmount()
+
+		if mode == 'system' then
+			vim.cmd('ETSystemPrompt')
+		else
+			agent.open_chat()
+		end
+	end
+
+	popup:map('n', ':w<CR>', save_and_close, { noremap = true, nowait = true })
+	popup:map('n', ':wq<CR>', save_and_close, { noremap = true, nowait = true })
+	popup:map('n', 'q', function()
+		popup:unmount()
+	end, { noremap = true, nowait = true })
+end
+
+-- Helper: detect focused tree window and return selected node's data
+local function get_focused_context()
+	local win = vim.api.nvim_get_current_win()
+
+	-- Check bravesearch result tree
+	if states.ui.bravesearch_result_tree then
+		local popup = states.ui.bravesearch_result_popup
+		if popup and popup.winid == win then
+			local node = states.ui.bravesearch_result_tree:get_node()
+			if node and node._res then
+				return vim.fn.json_encode({
+					source = 'bravesearch',
+					type = states.bravesearch.selected_type,
+					result = node._res,
+				})
+			end
+		end
+	end
+
+	-- Check context7 library result tree
+	if states.ui.library_result_tree then
+		local tree_win = nil
+		for _, w in ipairs(vim.api.nvim_list_wins()) do
+			local ok, buf = pcall(vim.api.nvim_win_get_buf, w)
+			if ok and states.ui.library_result_tree.bufnr == buf then
+				tree_win = w
+				break
+			end
+		end
+		if tree_win == win then
+			local node = states.ui.library_result_tree:get_node()
+			if node and node._res then
+				return vim.fn.json_encode({
+					source = 'context7',
+					type = 'library',
+					result = node._res,
+				})
+			end
+		end
+	end
+
+	-- Check context7 docs result tree
+	if states.ui.docs_result_tree then
+		local tree_win = nil
+		for _, w in ipairs(vim.api.nvim_list_wins()) do
+			local ok, buf = pcall(vim.api.nvim_win_get_buf, w)
+			if ok and states.ui.docs_result_tree.bufnr == buf then
+				tree_win = w
+				break
+			end
+		end
+		if tree_win == win then
+			local node = states.ui.docs_result_tree:get_node()
+			if node and node._res then
+				return vim.fn.json_encode({
+					source = 'context7',
+					type = 'docs',
+					result = node._res,
+				})
+			end
+		end
+	end
+
+	return nil
+end
+
+vim.api.nvim_create_user_command('ETAddToSystemPrompt', function()
+	local context = get_focused_context()
+	if context then
+		open_review_popup(context, 'system')
+	else
+		vim.notify('ETAddToSystemPrompt: Focus a BraveSearch or Context7 result window. Use :ETSystemPrompt to edit the system prompt directly.', vim.log.levels.WARN)
+	end
+end, { desc = 'Add context to system prompt' })
+
+vim.api.nvim_create_user_command('ETAddToPrompt', function()
+	local context = get_focused_context()
+	if context then
+		open_review_popup(context, 'prompt')
+	else
+		vim.notify('ETAddToPrompt: Focus a BraveSearch or Context7 result window. Use :ET to open the chat and type a prompt directly.', vim.log.levels.WARN)
+	end
+end, { desc = 'Add context to current prompt' })
+
+vim.api.nvim_create_user_command('ETSystemPrompt', function()
+	local full_prompt = states.get_system_prompt()
+
+	local lines = vim.split(full_prompt, '\n')
+	local height = math.max(#lines + 2, 10)
+
+	local popup = Popup({
+		enter = true,
+		focusable = true,
+		position = '50%',
+		zindex = 200,
+		size = { width = '60%', height = height },
+		border = {
+			style = 'rounded',
+			text = {
+				top = '[System Prompt]',
+				top_align = 'left',
+			},
+		},
+		buf_options = {
+			modifiable = true,
+			readonly = false,
+		},
+		win_options = {
+			relativenumber = true,
+		},
+	})
+
+	popup:mount()
+	vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
+	local last_line = vim.api.nvim_buf_line_count(popup.bufnr)
+	vim.api.nvim_win_set_cursor(popup.winid, { last_line, 0 })
+
+	local function save_and_close()
+		local new_lines = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
+		local content = table.concat(new_lines, '\n'):gsub('%s*$', '')
+		local cfg = config.get_config()
+		cfg.system_prompt = content
+		config.set_config(cfg)
+		states._system_prompt_additions = {}
+		states.save()
+		popup:unmount()
+		vim.notify('ET.nvim: System prompt updated')
+	end
+
+	popup:map('n', ':w<CR>', save_and_close, { noremap = true, nowait = true })
+	popup:map('n', ':wq<CR>', save_and_close, { noremap = true, nowait = true })
+	popup:map('n', 'q', function()
+		popup:unmount()
+	end, { noremap = true, nowait = true })
+end, { desc = 'Edit system prompt' })
 
 vim.api.nvim_create_user_command('ETInstallTools', function()
 	tools.setup_external_tools()

@@ -24,21 +24,29 @@
 - [x] ETBraveSearch & ETContext7 with input + popup 
     - use jq to populate it
     - inject into agent's memory via system prompt
-- [ ] Add states module for the states, and refactor ui from commands module
+- [x] Add states module for the states, and refactor ui from commands module
     - add code snippets into states 
-- [ ] ETAddToSystemPrompt, ETAddToPrompt
+- [x] ETAddToSystemPrompt, ETAddToPrompt
     - persistent system prompt based on project/codebase path
+- [x] separate states into agent.prompt & agent.execution 
+- [x] tool orchestrator
+    - execute tool
+    - identify tool
 - [x] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
-    - check for updates (ETKnowledgeSync)
-- [ ] wire file picker and range selector into ET
-- [ ] wire nvim tools
+    - notify user bx and ctx7 is not setup the knowledge is default model knowledge (ETSetupKnowledge)
+    - check for updates (ETKnowledgeSync - just use the same commands to replace with latest knowledge)
+- [x] wire file picker and range selector into ET
+- [x] wire nvim tools
 - [ ] pr flow for any edits
     - [ ] vimdiff
     - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
+- [ ] doc and readme update
 - [ ] quickfix integration
 - [ ] diagnosis integration
 - [ ] nvim extended tools (e.g. func definition, symbols, func implementation)
 - [ ] diagnosis integration
 - [ ] agent swarm with tdd
+    - take the passed test result 
+    - ask a simple prompt after execution completed - "this was the prompt, check the current codebase states, if it fullfills the prompt, run <tool>done</tool>, if not enhance it"
