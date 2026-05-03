@@ -1,14 +1,18 @@
 local M = {}
 local fzf = require('fzf-lua')
 
-function M.select_files()
+function M.select_files(callback)
 	fzf.files({
 		actions = {
 			['default'] = function(selected)
-				-- Extract the path (strips icons/formatting)
-				local file = fzf.path.entry_to_file(selected[1])
-				-- TODO: insert selected files into ETChat's Input Popup
-				return file.path
+				local paths = {}
+				for _, s in ipairs(selected) do
+					local file = fzf.path.entry_to_file(s)
+					table.insert(paths, file.path)
+				end
+				if callback then
+					callback(paths)
+				end
 			end,
 		},
 	})
@@ -25,6 +29,7 @@ function M.select_line_of_codes(opts)
 
 	-- TODO: parse into Agent
 	local out = abs .. anchor
+	return out
 end
 
 -- Receive filename(s), return absolute path(s)
@@ -128,11 +133,11 @@ function M.use_brave_search(search_type, query_content, count)
 		-- Only return web results, exclude news/videos/discussions
 		table.insert(cmd_parts, '--result-filter')
 		table.insert(cmd_parts, 'web')
-		jq_filter = '[.web.results[] | {title, url}]'
+		jq_filter = '[.web.results[] | {title, url, description}]'
 	elseif search_type == 'news' then
-		jq_filter = '[.results[] | {title, url, age}]'
+		jq_filter = '[.results[] | {title, url, age, description}]'
 	elseif search_type == 'images' then
-		jq_filter = '[.results[] | {title, url, thumbnail: .thumbnail.src}]'
+		jq_filter = '[.results[] | {title, url, source, thumbnail: .thumbnail.src}]'
 	elseif search_type == 'videos' then
 		jq_filter = '[.results[] | {title, url, duration: .video.duration, thumbnail: .thumbnail}]'
 	end

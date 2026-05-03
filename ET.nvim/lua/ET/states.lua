@@ -19,6 +19,7 @@ M.context7 = {
 -- UI references
 M.ui = {
 	chat_popup = nil,
+	chat_buffer_lines = {},
 	library_result_tree = nil,
 	docs_result_tree = nil,
 	docs_library_input = nil,
