@@ -115,26 +115,20 @@ function M.get_models()
 	return models
 end
 
-function M._prompt(contents, on_chunk, on_done)
+function M._prompt(messages, on_tool_call, on_done, opts)
+	opts = opts or {}
 	local cfg = M.get_config()
 	local url = cfg.endpoint .. '/chat/completions'
-
-	local messages = {}
-	if type(contents) == 'string' then
-		table.insert(messages, { role = 'user', content = contents })
-	elseif type(contents) == 'table' then
-		messages = contents
-	end
-
-	if cfg.system_prompt and cfg.system_prompt ~= '' then
-		table.insert(messages, 1, { role = 'system', content = cfg.system_prompt })
-	end
 
 	local payload = {
 		model = cfg.model,
 		messages = messages,
 		stream = true,
 	}
+
+	if opts.tools then
+		payload.tools = opts.tools
+	end
 
 	if cfg.sampling_params then
 		payload = vim.tbl_deep_extend('force', payload, cfg.sampling_params)
@@ -158,6 +152,7 @@ function M._prompt(contents, on_chunk, on_done)
 	table.insert(cmd, url)
 
 	local full_content = {}
+	local tool_calls = {}
 
 	local function on_stdout(_, data)
 		if data and #data > 0 then
@@ -166,13 +161,51 @@ function M._prompt(contents, on_chunk, on_done)
 					local json_str = line:sub(7)
 					if json_str ~= '[DONE]' then
 						local ok, decoded = pcall(vim.fn.json_decode, json_str)
-						if ok and decoded.choices and decoded.choices[1] and decoded.choices[1].delta then
-							local content = decoded.choices[1].delta.content
-							if content then
-								table.insert(full_content, content)
-								if on_chunk then
-									on_chunk(content)
+						if ok and decoded.choices and decoded.choices[1] then
+							local choice = decoded.choices[1]
+							local delta = choice.delta
+
+							if delta then
+								if delta.content then
+									table.insert(full_content, delta.content)
 								end
+
+								if delta.tool_calls then
+									for _, tc in ipairs(delta.tool_calls) do
+										local idx = tc.index + 1
+										if not tool_calls[idx] then
+											tool_calls[idx] = {
+												id = tc.id or '',
+												type = tc.type or 'function',
+												['function'] = {
+													name = tc['function'] and tc['function'].name or '',
+													arguments = '',
+												},
+											}
+										end
+										if tc.id and tc.id ~= '' then
+											tool_calls[idx].id = tc.id
+										end
+										if tc['function'] and tc['function'].name and tc['function'].name ~= '' then
+											tool_calls[idx]['function'].name = tc['function'].name
+										end
+										if tc['function'] and tc['function'].arguments then
+											tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. tc['function'].arguments
+										end
+									end
+								end
+							end
+
+							if choice.finish_reason == 'tool_calls' then
+								if on_tool_call then
+									on_tool_call(tool_calls)
+								end
+								return
+							elseif choice.finish_reason == 'stop' then
+								if on_done then
+									on_done(table.concat(full_content))
+								end
+								return
 							end
 						end
 					end
@@ -182,7 +215,11 @@ function M._prompt(contents, on_chunk, on_done)
 	end
 
 	local function on_exit(_, code)
-		if on_done then
+		if #tool_calls > 0 then
+			if on_tool_call then
+				on_tool_call(tool_calls)
+			end
+		elseif on_done then
 			on_done(table.concat(full_content))
 		end
 	end

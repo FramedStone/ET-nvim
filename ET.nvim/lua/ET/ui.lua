@@ -48,7 +48,9 @@ function M.create_popup(title, width, height)
 	local popup = Popup({
 		enter = true,
 		focusable = true,
+		relative = 'editor',
 		position = '50%',
+		zindex = 200,
 		size = { width = width, height = height },
 		border = {
 			style = 'rounded',
@@ -61,6 +63,9 @@ function M.create_popup(title, width, height)
 			buftype = '',
 			modifiable = true,
 			readonly = false,
+		},
+		win_options = {
+			relativenumber = true,
 		},
 	})
 
