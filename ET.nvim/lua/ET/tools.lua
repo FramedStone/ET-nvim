@@ -348,10 +348,17 @@ function M.web_fetch(url, query)
 		return { error = 'URL is required' }
 	end
 
-	local page = states.current_page
+	-- Check cache: reuse if same URL was already fetched
+	local page
+	for _, p in ipairs(states.web_fetch_history) do
+		if p.url == url then
+			page = p
+			break
+		end
+	end
 
-	-- Different URL or empty cache → fetch
-	if page.url ~= url then
+	-- Not in cache → fetch
+	if not page then
 		local curl_cmd = string.format(
 			'curl -sL --max-time 10 --max-filesize 1048576 %s',
 			vim.fn.shellescape(url)
@@ -385,14 +392,14 @@ function M.web_fetch(url, query)
 			end
 		end
 
-		states.current_page = {
+		page = {
 			url = url,
 			title = title or '',
 			lines = cached,
 			total_lines = total,
 			truncated = truncated,
 		}
-		page = states.current_page
+		table.insert(states.web_fetch_history, page)
 	end
 
 	-- Query mode: grep cached content

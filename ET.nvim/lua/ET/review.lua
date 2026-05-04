@@ -1,8 +1,9 @@
 local M = {}
 local tools = require('ET.tools')
 
-function M.review(edits)
+function M.review(edits, on_complete)
 	if #edits == 0 then
+		if on_complete then on_complete() end
 		return
 	end
 
@@ -30,6 +31,7 @@ function M.review(edits)
 		end
 
 		vim.notify(string.format('ET.nvim: Accepted %d / %d edits', #accepted_list, #edits), vim.log.levels.INFO)
+		if on_complete then on_complete() end
 	end
 
 	local function bind_keys(old_buf, new_buf, index)

@@ -821,15 +821,36 @@ local function get_focused_context()
 		end
 	end
 
+	-- Check web_fetch results popup
+	if states.ui.web_fetch_popup then
+		local popup = states.ui.web_fetch_popup
+		if popup.winid and popup.winid == win then
+			local idx = states.ui.web_fetch_popup_index or 1
+			local results = states.web_fetch_history or {}
+			if results[idx] then
+				local page = results[idx]
+				return vim.fn.json_encode({
+					source = 'web_fetch',
+					url = page.url,
+					title = page.title,
+				})
+			end
+		end
+	end
+
 	return nil
 end
+
+vim.api.nvim_create_user_command('ETWebFetchResults', function()
+	agent.show_web_fetch_results()
+end, { desc = 'Show web_fetch results from the last agent run' })
 
 vim.api.nvim_create_user_command('ETAddToSystemPrompt', function()
 	local context = get_focused_context()
 	if context then
 		open_review_popup(context, 'system')
 	else
-		vim.notify('ETAddToSystemPrompt: Focus a BraveSearch or Context7 result window. Use :ETSystemPrompt to edit the system prompt directly.', vim.log.levels.WARN)
+		vim.notify('ETAddToSystemPrompt: Focus a BraveSearch, Context7, or Web Fetch Results window. Use :ETSystemPrompt to edit the system prompt directly.', vim.log.levels.WARN)
 	end
 end, { desc = 'Add context to system prompt' })
 
@@ -838,7 +859,7 @@ vim.api.nvim_create_user_command('ETAddToPrompt', function()
 	if context then
 		open_review_popup(context, 'prompt')
 	else
-		vim.notify('ETAddToPrompt: Focus a BraveSearch or Context7 result window. Use :ET to open the chat and type a prompt directly.', vim.log.levels.WARN)
+		vim.notify('ETAddToPrompt: Focus a BraveSearch, Context7, or Web Fetch Results window. Use :ET to open the chat and type a prompt directly.', vim.log.levels.WARN)
 	end
 end, { desc = 'Add context to current prompt' })
 
