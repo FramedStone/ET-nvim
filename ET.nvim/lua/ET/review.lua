@@ -70,16 +70,6 @@ function M.review(edits)
 			finish()
 		end
 
-		local function do_next()
-			next_undecided(index)
-		end
-
-		local function do_prev()
-			if index > 1 then
-				show_diff(index - 1)
-			end
-		end
-
 		local function set_kmap(buf, key, cb)
 			vim.keymap.set('n', key, cb, { buffer = buf, noremap = true, nowait = true, silent = true })
 		end
@@ -90,10 +80,6 @@ function M.review(edits)
 		set_kmap(new_buf, 'q', decline)
 		set_kmap(old_buf, ':q<CR>', decline_all)
 		set_kmap(new_buf, ':q<CR>', decline_all)
-		set_kmap(old_buf, 'l', do_next)
-		set_kmap(new_buf, 'l', do_next)
-		set_kmap(old_buf, 'h', do_prev)
-		set_kmap(new_buf, 'h', do_prev)
 	end
 
 	show_diff = function(index)
