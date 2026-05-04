@@ -35,43 +35,6 @@ function M.select_line_of_codes(opts, bufnr)
 	return out
 end
 
--- Receive filename(s), return absolute path(s)
-function M.find_files(filenames)
-	local results = {}
-	local basename_set = {}
-	for _, filename in ipairs(filenames) do
-		basename_set[vim.fn.fnamemodify(filename, ':t')] = true
-		local output = vim.fn.system(string.format('find . -name "%s"', filename))
-		if output and output ~= '' then
-			for _, path in ipairs(vim.split(output, '\n')) do
-				if path ~= '' then
-					local abs_path = vim.fn.fnamemodify(path, ':p')
-					table.insert(results, abs_path)
-				end
-			end
-		end
-	end
-
-	for _, edit in ipairs(states.pending_edits) do
-		if edit.type == 'write' and basename_set[vim.fn.fnamemodify(edit.filepath, ':t')] then
-			if vim.fn.filereadable(edit.filepath) == 0 then
-				local found = false
-				for _, r in ipairs(results) do
-					if r == edit.filepath then
-						found = true
-						break
-					end
-				end
-				if not found then
-					table.insert(results, edit.filepath)
-				end
-			end
-		end
-	end
-
-	return results
-end
-
 local function get_virtualized_lines(filepath)
 	local lines = vim.fn.readfile(filepath)
 
@@ -379,24 +342,6 @@ M.tool_definitions = {
 	{
 		type = 'function',
 		['function'] = {
-			name = 'find_files',
-			description = 'Find files by name pattern in the project directory',
-			parameters = {
-				type = 'object',
-				properties = {
-					filenames = {
-						type = 'array',
-						items = { type = 'string' },
-						description = 'List of filenames or glob patterns to search for',
-					},
-				},
-				required = { 'filenames' },
-			},
-		},
-	},
-	{
-		type = 'function',
-		['function'] = {
 			name = 'read_file',
 			description = 'Read the contents of a file',
 			parameters = {
@@ -460,9 +405,7 @@ M.tool_definitions = {
 }
 
 function M.dispatch(name, args)
-	if name == 'find_files' then
-		return M.find_files(args.filenames)
-	elseif name == 'read_file' then
+	if name == 'read_file' then
 		return M.read_file(args.filepath)
 	elseif name == 'edit_file' then
 		return M.stage_edit(args.filepath, args.start_line, args.end_line, args.contents)
