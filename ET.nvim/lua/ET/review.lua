@@ -82,9 +82,14 @@ function M.review(edits, on_complete)
 		set_kmap(new_buf, 'q', decline)
 		set_kmap(old_buf, ':q<CR>', decline_all)
 		set_kmap(new_buf, ':q<CR>', decline_all)
+		set_kmap(old_buf, 'l', function() show_diff(index + 1) end)
+		set_kmap(new_buf, 'l', function() show_diff(index + 1) end)
+		set_kmap(old_buf, 'h', function() show_diff(index - 1) end)
+		set_kmap(new_buf, 'h', function() show_diff(index - 1) end)
 	end
 
 	show_diff = function(index)
+		if index < 1 then index = 1 end
 		if index > #edits then
 			finish()
 			return
@@ -104,11 +109,17 @@ function M.review(edits, on_complete)
 			new_lines = { '' }
 		end
 
+		local status = ''
+		if accepted[index] == true then
+			status = ' [accepted]'
+		elseif accepted[index] == false then
+			status = ' [declined]'
+		end
 		local title = string.format('[%d/%d] %s', index, #edits, edit.filepath)
 		if edit.type == 'edit' then
 			title = title .. '#L' .. edit.start_line .. '-L' .. edit.end_line
 		end
-		vim.notify(title, vim.log.levels.INFO)
+		vim.notify(title .. status, vim.log.levels.INFO)
 
 		local old_buf = vim.api.nvim_create_buf(false, true)
 		vim.api.nvim_buf_set_lines(old_buf, 0, -1, false, old_lines)
