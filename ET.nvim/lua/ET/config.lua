@@ -153,6 +153,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 
 	local full_content = {}
 	local tool_calls = {}
+	local fired_tools = false
 
 	local function on_stdout(_, data)
 		if data and #data > 0 then
@@ -196,17 +197,19 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 								end
 							end
 
-							if choice.finish_reason == 'tool_calls' then
-								if on_tool_call then
-									on_tool_call(tool_calls)
-								end
-								return
-							elseif choice.finish_reason == 'stop' then
-								if on_done then
-									on_done(table.concat(full_content))
-								end
-								return
+						if choice.finish_reason == 'tool_calls' then
+							if on_tool_call then
+								on_tool_call(tool_calls)
+								tool_calls = {}
+								fired_tools = true
 							end
+							return
+						elseif choice.finish_reason == 'stop' then
+							if on_done then
+								on_done(table.concat(full_content))
+							end
+							return
+						end
 						end
 					end
 				end
@@ -218,8 +221,9 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 		if #tool_calls > 0 then
 			if on_tool_call then
 				on_tool_call(tool_calls)
+				tool_calls = {}
 			end
-		elseif on_done then
+		elseif on_done and not fired_tools then
 			on_done(table.concat(full_content))
 		end
 	end

@@ -4,91 +4,6 @@ local ui = require('ET.ui')
 local tools = require('ET.tools')
 local states = require('ET.states')
 
--- Tool definitions (OpenAI-compatible format)
-local tool_definitions = {
-	{
-		type = 'function',
-		['function'] = {
-			name = 'find_files',
-			description = 'Find files by name pattern in the project directory',
-			parameters = {
-				type = 'object',
-				properties = {
-					filenames = {
-						type = 'array',
-						items = { type = 'string' },
-						description = 'List of filenames or glob patterns to search for',
-					},
-				},
-				required = { 'filenames' },
-			},
-		},
-	},
-	{
-		type = 'function',
-		['function'] = {
-			name = 'read_file',
-			description = 'Read the contents of a file',
-			parameters = {
-				type = 'object',
-				properties = {
-					filepath = {
-						type = 'string',
-						description = 'Absolute path to the file',
-					},
-				},
-				required = { 'filepath' },
-			},
-		},
-	},
-	{
-		type = 'function',
-		['function'] = {
-			name = 'edit_file',
-			description = 'Replace lines in a file between start_line and end_line with new contents',
-			parameters = {
-				type = 'object',
-				properties = {
-					filepath = { type = 'string' },
-					start_line = { type = 'integer' },
-					end_line = { type = 'integer' },
-					contents = { type = 'string', description = 'New content to replace the lines with' },
-				},
-				required = { 'filepath', 'start_line', 'end_line', 'contents' },
-			},
-		},
-	},
-	{
-		type = 'function',
-		['function'] = {
-			name = 'write_file',
-			description = 'Write contents to a file (creates or overwrites)',
-			parameters = {
-				type = 'object',
-				properties = {
-					filepath = { type = 'string' },
-					contents = { type = 'string', description = 'Content to write to the file' },
-				},
-				required = { 'filepath', 'contents' },
-			},
-		},
-	},
-}
-
--- Tool dispatcher
-local function dispatch_tool(name, args)
-	if name == 'find_files' then
-		return tools.find_files(args.filenames)
-	elseif name == 'read_file' then
-		return tools.read_file(args.filepath)
-	elseif name == 'edit_file' then
-		return tools.edit_file(args.filepath, args.start_line, args.end_line, args.contents)
-	elseif name == 'write_file' then
-		return tools.write_file(args.filepath, args.contents)
-	end
-	return { error = 'Unknown tool: ' .. tostring(name) }
-end
-
 -- Initialize: check for model, onboard if needed
 function M.init()
 	local cfg = config.get_config()
@@ -245,14 +160,19 @@ function M.prompt()
 
 			table.insert(msgs, assistant_msg)
 
-			-- Dispatch each tool call
+			local should_stop = false
+
 			for _, tc in ipairs(tool_calls) do
 				local ok, args = pcall(vim.fn.json_decode, tc['function'].arguments)
 				local result
 				if ok then
-					local success, tool_result = pcall(dispatch_tool, tc['function'].name, args)
+					local success, tool_result = pcall(tools.dispatch, tc['function'].name, args)
 					if success then
 						result = vim.fn.json_encode(tool_result)
+						if tool_result and tool_result.stop then
+							should_stop = true
+							vim.notify('Agent: ' .. (tool_result.message or ''), vim.log.levels.INFO)
+						end
 					else
 						result = vim.fn.json_encode({ error = tostring(tool_result) })
 					end
@@ -267,13 +187,31 @@ function M.prompt()
 				})
 			end
 
-			-- Continue the loop
+			if should_stop then
+				states._current_prompt_context = {}
+				if #states.pending_edits > 0 then
+					local review = require('ET.review')
+					review.review(states.pending_edits)
+					states.pending_edits = {}
+				end
+				return
+			end
+
 			loop(msgs)
 		end, function(content)
 			-- Final response (no more tool calls)
 			vim.notify('ET.nvim: Done', vim.log.levels.INFO)
+			if content and content ~= '' and content ~= 'Done' then
+				vim.notify('Agent: ' .. content, vim.log.levels.INFO)
+			end
 			states._current_prompt_context = {}
-		end)
+
+			if #states.pending_edits > 0 then
+				local review = require('ET.review')
+				review.review(states.pending_edits)
+				states.pending_edits = {}
+			end
+		end, { tools = tools.tool_definitions })
 	end
 
 	loop(messages)
