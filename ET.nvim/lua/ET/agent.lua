@@ -116,7 +116,7 @@ end
 function M.show_web_fetch_results()
 	local results = states.web_fetch_history
 	if #results == 0 then
-		vim.notify('ET.nvim: No web_fetch results to show', vim.log.levels.WARN)
+		-- vim.notify('ET.nvim: No web_fetch results to show', vim.log.levels.WARN)
 		return
 	end
 
@@ -136,8 +136,12 @@ function M.show_web_fetch_results()
 		local page = results[idx]
 		local header = string.format('Page %d/%d \226\128\148 URL: %s', idx, #results, page.url)
 		local title_line = 'Title: ' .. (page.title ~= '' and page.title or '(no title)')
-		local meta = string.format('Lines: %d cached / %d total%s',
-			#page.lines, page.total_lines, page.truncated and ' (truncated)' or '')
+		local meta = string.format(
+			'Lines: %d cached / %d total%s',
+			#page.lines,
+			page.total_lines,
+			page.truncated and ' (truncated)' or ''
+		)
 		local sep = string.rep('\226\148\128', 60)
 
 		local content_lines = {
@@ -154,7 +158,10 @@ function M.show_web_fetch_results()
 		end
 		if show_count < #page.lines then
 			table.insert(content_lines, '')
-			table.insert(content_lines, string.format('... %d more lines (use web_fetch(url, "query") to search)', #page.lines - show_count))
+			table.insert(
+				content_lines,
+				string.format('... %d more lines (use web_fetch(url, "query") to search)', #page.lines - show_count)
+			)
 		end
 
 		vim.api.nvim_buf_set_option(popup.bufnr, 'modifiable', true)
@@ -218,8 +225,12 @@ function M.show_web_fetch_results()
 	popup:map('n', ':q<CR>', close, { noremap = true, nowait = true })
 	popup:map('n', 'a', add_to_prompt, { noremap = true, nowait = true })
 	popup:map('n', 'A', add_to_system_prompt, { noremap = true, nowait = true })
-	popup:map('n', ':w<CR>', function() vim.cmd('ETAddToPrompt') end, { noremap = true, nowait = true })
-	popup:map('n', ':wq<CR>', function() vim.cmd('ETAddToSystemPrompt') end, { noremap = true, nowait = true })
+	popup:map('n', ':w<CR>', function()
+		vim.cmd('ETAddToPrompt')
+	end, { noremap = true, nowait = true })
+	popup:map('n', ':wq<CR>', function()
+		vim.cmd('ETAddToSystemPrompt')
+	end, { noremap = true, nowait = true })
 end
 
 -- Agent prompt loop (tool-only, no streaming to UI)
@@ -293,7 +304,8 @@ function M.prompt()
 						result = vim.fn.json_encode({ error = tostring(tool_result) })
 					end
 				else
-					result = vim.fn.json_encode({ error = 'Failed to parse tool arguments: ' .. tc['function'].arguments })
+					result =
+						vim.fn.json_encode({ error = 'Failed to parse tool arguments: ' .. tc['function'].arguments })
 				end
 
 				table.insert(msgs, {
