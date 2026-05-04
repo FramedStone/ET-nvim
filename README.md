@@ -1,8 +1,8 @@
 # Human-First Neovim AI Agent made for [oMLX](https://github.com/jundot/omlx)
 - onboard flow
-- partially stateful memory (temp memory)
+- stateless agent
 - tools
-    - vim find, read, edit, write
+    - vim read, edit, write
     - brave search
     - context7
 - quickfix integration

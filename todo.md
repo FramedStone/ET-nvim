@@ -38,10 +38,8 @@
     - check for updates (ETKnowledgeSync - just use the same commands to replace with latest knowledge)
 - [x] wire file picker and range selector into ET
 - [x] wire nvim tools
-- [ ] pr flow for any edits
-    - [ ] vimdiff
-    - [ ] using jq for tools result cherry picking
-    - [ ] temp buffer for pr
+- [x] pr flow for any edits
+    - vimdiff
 - [ ] refactor codebase: decouple modules and simplify
 - [ ] doc and readme update
 - [ ] quickfix integration
