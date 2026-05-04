@@ -845,23 +845,35 @@ vim.api.nvim_create_user_command('ETWebFetchResults', function()
 	agent.show_web_fetch_results()
 end, { desc = 'Show web_fetch results from the last agent run' })
 
-vim.api.nvim_create_user_command('ETAddToSystemPrompt', function()
-	local context = get_focused_context()
-	if context then
+vim.api.nvim_create_user_command('ETAddToSystemPrompt', function(opts)
+	local context
+	if opts.range > 0 then
+		local lines = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, false)
+		context = table.concat(lines, '\n')
+	else
+		context = get_focused_context()
+	end
+	if context and context ~= '' then
 		open_review_popup(context, 'system')
 	else
-		vim.notify('ETAddToSystemPrompt: Focus a BraveSearch, Context7, or Web Fetch Results window. Use :ETSystemPrompt to edit the system prompt directly.', vim.log.levels.WARN)
+		vim.notify('ETAddToSystemPrompt: Select text with visual mode, or focus a BraveSearch/Context7/Web Fetch Results window. Use :ETSystemPrompt to edit the system prompt directly.', vim.log.levels.WARN)
 	end
-end, { desc = 'Add context to system prompt' })
+end, { range = true, desc = 'Add context to system prompt' })
 
-vim.api.nvim_create_user_command('ETAddToPrompt', function()
-	local context = get_focused_context()
-	if context then
+vim.api.nvim_create_user_command('ETAddToPrompt', function(opts)
+	local context
+	if opts.range > 0 then
+		local lines = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, false)
+		context = table.concat(lines, '\n')
+	else
+		context = get_focused_context()
+	end
+	if context and context ~= '' then
 		open_review_popup(context, 'prompt')
 	else
-		vim.notify('ETAddToPrompt: Focus a BraveSearch, Context7, or Web Fetch Results window. Use :ET to open the chat and type a prompt directly.', vim.log.levels.WARN)
+		vim.notify('ETAddToPrompt: Select text with visual mode, or focus a BraveSearch/Context7/Web Fetch Results window. Use :ET to open the chat and type a prompt directly.', vim.log.levels.WARN)
 	end
-end, { desc = 'Add context to current prompt' })
+end, { range = true, desc = 'Add context to current prompt' })
 
 vim.api.nvim_create_user_command('ETSystemPrompt', function()
 	local full_prompt = states.get_system_prompt()
