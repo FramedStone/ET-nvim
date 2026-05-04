@@ -3,6 +3,7 @@
 - stateless agent
 - tools
     - vim find, read, edit
+    - web_fetch
     - brave search
     - context7
 - quickfix integration
@@ -23,3 +24,6 @@ formatter
 
 Memory management
 - temp chat history per neovim session
+
+required library
+- lynx (via brew)
