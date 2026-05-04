@@ -13,6 +13,7 @@
     - find
     - read
     - edit
+    - write
 - [x] external tools
    - bravesearch
    - context7
@@ -32,6 +33,7 @@
     - execute tool
     - identify tool
 - [x] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
+- [ ] verbose tool calling message via vim.notify('ET.nvim: calling tool-name')
 - [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
     - notify user bx and ctx7 is not setup the knowledge is default model knowledge (ETSetupKnowledge)
     - check for updates (ETKnowledgeSync - just use the same commands to replace with latest knowledge)

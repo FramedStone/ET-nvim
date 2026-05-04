@@ -284,6 +284,198 @@ function M.use_brave_search(search_type, query_content, count)
 	return decoded
 end
 
+-- WebFetch
+-- Fetches and caches a web page. With a query, greps the cached content.
+-- Primary HTML→text via lynx, with Lua fallback stripping.
+
+-- Sanitize to valid UTF-8 using system iconv. Discards invalid bytes.
+local function sanitize_utf8(str)
+	return vim.iconv(str, 'UTF-8', 'UTF-8//IGNORE') or str
+end
+
+local function html_to_lines(raw_html)
+	-- Try lynx first
+	if vim.fn.executable('lynx') == 1 then
+		local tmpfile = vim.fn.tempname()
+		vim.fn.writefile(vim.split(raw_html, '\n'), tmpfile)
+		local out = vim.fn.system(string.format('lynx -dump -stdin -nolist -width=120 < %s', vim.fn.shellescape(tmpfile)))
+		vim.fn.delete(tmpfile)
+		if vim.v.shell_error == 0 and out ~= '' then
+			out = sanitize_utf8(out)
+			return vim.split(out, '\n')
+		end
+	end
+
+	-- Fallback: basic Lua stripping
+	local text = sanitize_utf8(raw_html)
+		:gsub('<script[^>]*>.-</script>', ' ')
+		:gsub('<style[^>]*>.-</style>', ' ')
+		:gsub('<[^>]+>', ' ')
+		:gsub('&nbsp;', ' ')
+		:gsub('&amp;', '&')
+		:gsub('&lt;', '<')
+		:gsub('&gt;', '>')
+		:gsub('&quot;', '"')
+		:gsub('&#39;', "'")
+		:gsub('&[%w#]+;', ' ')
+
+	local raw_lines = {}
+	for _, line in ipairs(vim.split(text, '\n')) do
+		line = line:gsub('%s+', ' '):gsub('^%s+', ''):gsub('%s+$', '')
+		table.insert(raw_lines, line)
+	end
+
+	-- Collapse consecutive blank lines
+	local lines = {}
+	local prev_blank = false
+	for _, line in ipairs(raw_lines) do
+		if line == '' then
+			if not prev_blank then
+				table.insert(lines, line)
+			end
+			prev_blank = true
+		else
+			table.insert(lines, line)
+			prev_blank = false
+		end
+	end
+
+	return lines, nil
+end
+
+function M.web_fetch(url, query)
+	if not url or url == '' then
+		return { error = 'URL is required' }
+	end
+
+	local page = states.current_page
+
+	-- Different URL or empty cache → fetch
+	if page.url ~= url then
+		local curl_cmd = string.format(
+			'curl -sL --max-time 10 --max-filesize 1048576 %s',
+			vim.fn.shellescape(url)
+		)
+		local raw = vim.fn.system(curl_cmd)
+		raw = sanitize_utf8(raw)
+		if vim.v.shell_error ~= 0 then
+			return { error = 'Failed to fetch URL: ' .. (raw:gsub('^%s*(.-)%s*$', '%1') or 'unknown error') }
+		end
+
+		-- Extract title before HTML stripping
+		local title = raw:match('<title[^>]*>([^<]*)</title>')
+
+		local lines = html_to_lines(raw)
+		local total = #lines
+
+		local max_cache = 20000
+		local truncated = total > max_cache
+		local cached = {}
+		for i = 1, math.min(total, max_cache) do
+			table.insert(cached, lines[i])
+		end
+
+		-- Fallback title from first non-blank line
+		if not title or title == '' then
+			for i = 1, math.min(10, #cached) do
+				if cached[i] ~= '' then
+					title = cached[i]
+					break
+				end
+			end
+		end
+
+		states.current_page = {
+			url = url,
+			title = title or '',
+			lines = cached,
+			total_lines = total,
+			truncated = truncated,
+		}
+		page = states.current_page
+	end
+
+	-- Query mode: grep cached content
+	if query and query ~= '' and page.lines and #page.lines > 0 then
+		local pattern = query:lower()
+		local matches = {}
+		local context = 2
+
+		for i, line in ipairs(page.lines) do
+			if line:lower():find(pattern, 1, true) then
+				local start = math.max(1, i - context)
+				local finish = math.min(#page.lines, i + context)
+				local block_lines = {}
+				for j = start, finish do
+					local marker = j == i and '>' or ' '
+					table.insert(block_lines, string.format('%s %d: %s', marker, j, page.lines[j]))
+				end
+				table.insert(matches, block_lines)
+				if #matches >= 25 then
+					break
+				end
+			end
+		end
+
+		if #matches == 0 then
+			return {
+				url = url,
+				query = query,
+				matches = 0,
+				message = string.format('No matches for "%s" in cached page (%d lines).', query, page.total_lines),
+			}
+		end
+
+		local first_line = tonumber(matches[1][1]:match('^> (%d+):')) or 0
+		local last_line = tonumber(matches[#matches][1]:match('^> (%d+):')) or 0
+
+		local summary = string.format(
+			'%d match%s across lines %d-%d (%d lines cached%s)',
+			#matches,
+			#matches == 1 and '' or 'es',
+			first_line,
+			last_line,
+			page.total_lines,
+			page.truncated and ', truncated' or ''
+		)
+
+		return {
+			url = url,
+			title = page.title,
+			query = query,
+			matches = #matches,
+			summary = summary,
+			results = matches,
+		}
+	end
+
+	-- Preview mode: return first 200 lines
+	local preview_lines = {}
+	local preview_count = math.min(200, #page.lines)
+	for i = 1, preview_count do
+		table.insert(preview_lines, page.lines[i])
+	end
+
+	local result = {
+		url = url,
+		title = page.title,
+		total_lines = page.total_lines,
+		cached_lines = #page.lines,
+		truncated = page.truncated,
+		preview = table.concat(preview_lines, '\n'),
+		hint = 'Use web_fetch(url, "query") to search this page.',
+	}
+
+	if page.truncated then
+		result.warning = string.format(
+			'Content past line %d is not cached. Use a more specific URL to narrow.',
+			#page.lines
+		)
+	end
+
+	return result
+end
+
 -- Context7
 -- # Query library documentation
 -- ctx7 library --json "react"
@@ -389,6 +581,21 @@ M.tool_definitions = {
 	{
 		type = 'function',
 		['function'] = {
+			name = 'web_fetch',
+			description = 'Fetch a web page and cache it. Use without query to get a preview. Use with query to grep the cached page for matching lines (case-insensitive).',
+			parameters = {
+				type = 'object',
+				properties = {
+					url = { type = 'string', description = 'Full URL including https://' },
+					query = { type = 'string', description = 'Optional: text to search for within the page' },
+				},
+				required = { 'url' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
 			name = 'done',
 			description = 'Call when the task is complete. Summarize what was accomplished.',
 			parameters = {
@@ -409,6 +616,8 @@ function M.dispatch(name, args)
 		return M.read_file(args.filepath)
 	elseif name == 'edit_file' then
 		return M.stage_edit(args.filepath, args.start_line, args.end_line, args.contents)
+	elseif name == 'web_fetch' then
+		return M.web_fetch(args.url, args.query)
 	elseif name == 'done' then
 		return { stop = true, message = args.message or 'Task completed' }
 	end

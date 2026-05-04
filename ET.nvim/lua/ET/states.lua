@@ -31,6 +31,15 @@ M.ui = {
 -- Staged edits pending review
 M.pending_edits = {}
 
+-- Web page cache (session-only, single page at a time)
+M.current_page = {
+	url = '',
+	title = '',
+	lines = {},
+	total_lines = 0,
+	truncated = false,
+}
+
 -- Persistence helpers
 local function get_project_hash()
 	local cwd = vim.fn.getcwd()
