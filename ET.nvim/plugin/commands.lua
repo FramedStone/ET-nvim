@@ -40,11 +40,18 @@ vim.api.nvim_create_user_command('ETFilePicker', function()
 end, { desc = 'Pick files and insert into current buffer' })
 
 vim.api.nvim_create_user_command('ET', function(opts)
+	local source_buf = vim.api.nvim_get_current_buf()
 	local popup = agent.open_chat()
 	if opts.range > 0 then
-		local out = tools.select_line_of_codes(opts)
+		local out = tools.select_line_of_codes(opts, source_buf)
 		if out and popup and popup.bufnr then
-			vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, { out })
+			vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, vim.split(out, '\n'))
+			vim.schedule(function()
+				if popup.winid then
+					local last = vim.api.nvim_buf_line_count(popup.bufnr)
+					vim.api.nvim_win_set_cursor(popup.winid, { last, 0 })
+				end
+			end)
 		end
 	end
 end, { range = true, desc = 'Open ET Chat' })

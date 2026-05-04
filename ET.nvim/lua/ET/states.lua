@@ -28,6 +28,9 @@ M.ui = {
 	bravesearch_result_popup = nil,
 }
 
+-- Staged edits pending review
+M.pending_edits = {}
+
 -- Persistence helpers
 local function get_project_hash()
 	local cwd = vim.fn.getcwd()
