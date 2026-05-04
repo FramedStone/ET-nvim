@@ -163,10 +163,12 @@ function M.prompt()
 			local should_stop = false
 
 			for _, tc in ipairs(tool_calls) do
+				local tool_name = tc['function'].name
+				vim.notify('ET.nvim: Calling tool → ' .. tool_name, vim.log.levels.INFO)
 				local ok, args = pcall(vim.fn.json_decode, tc['function'].arguments)
 				local result
 				if ok then
-					local success, tool_result = pcall(tools.dispatch, tc['function'].name, args)
+					local success, tool_result = pcall(tools.dispatch, tool_name, args)
 					if success then
 						result = vim.fn.json_encode(tool_result)
 						if tool_result and tool_result.stop then

@@ -154,6 +154,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	local full_content = {}
 	local tool_calls = {}
 	local fired_tools = false
+	local finished = false
 
 	local function on_stdout(_, data)
 		if data and #data > 0 then
@@ -205,7 +206,8 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 							end
 							return
 						elseif choice.finish_reason == 'stop' then
-							if on_done then
+							if on_done and not finished then
+								finished = true
 								on_done(table.concat(full_content))
 							end
 							return
@@ -223,7 +225,8 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 				on_tool_call(tool_calls)
 				tool_calls = {}
 			end
-		elseif on_done and not fired_tools then
+		elseif on_done and not fired_tools and not finished then
+			finished = true
 			on_done(table.concat(full_content))
 		end
 	end
