@@ -112,7 +112,67 @@ function M.read_file(filepath)
 	return table.concat(lines, '\n')
 end
 
+-- Detects and fixes accidental Lua/JS string-literal wrapping in content.
+-- E.g. model sends "hello" or "line1\\nline2" instead of raw text.
+-- Strips outer matching quotes; JSON-decodes inner if it has escape sequences.
+local function sanitize_content(contents)
+	if type(contents) ~= 'string' then
+		return contents
+	end
+	local first = contents:sub(1, 1)
+	if (first == '"' or first == "'") and first == contents:sub(-1) then
+		local inner = contents:sub(2, -2)
+		if inner:find('\\n') or inner:find('\\t') then
+			-- Re-wrap as JSON string literal → decode handles all escapes
+			local ok, decoded = pcall(vim.fn.json_decode, '"' .. inner .. '"')
+			if ok and type(decoded) == 'string' then
+				return decoded
+			end
+		end
+		-- No escape sequences: just strip the accidental wrapping quotes
+		return inner
+	end
+	return contents
+end
+
+-- Search-and-replace by content (no line numbers).
+-- Finds oldText in the file and replaces with newText.
+-- Delegates to stage_edit for line-based staging and review.
+function M.edit_file(filepath, oldText, newText)
+	-- Sanitize: strip accidental string-literal wrapping from both
+	newText = sanitize_content(newText)
+	oldText = sanitize_content(oldText)
+
+	local virt_content = M.read_file(filepath)
+	if not virt_content then
+		return { error = 'Failed to read file: ' .. filepath }
+	end
+
+	-- Find oldText in the file (plain text, exact match)
+	local start_pos, end_pos = virt_content:find(oldText, 1, true)
+	if not start_pos then
+		-- Try to help: show what the file looks like near where we expected
+		local preview = virt_content:sub(1, math.min(1000, #virt_content))
+		local hint = 'oldText not found in file. Copy-paste the exact text from read_file output. File preview (first 1000 chars):\n' .. preview
+		if #virt_content > 1000 then
+			hint = hint .. '\n... (truncated)'
+		end
+		return { error = hint }
+	end
+
+	-- Calculate line numbers from position
+	local before = virt_content:sub(1, start_pos - 1)
+	local _, newline_count = before:gsub('\n', '')
+	local start_line = newline_count + 1
+	local old_lines = vim.split(oldText, '\n')
+	local end_line = start_line + #old_lines - 1
+
+	-- Delegate to line-based staging
+	return M.stage_edit(filepath, start_line, end_line, newText)
+end
+
 function M.stage_edit(filepath, start_line, end_line, contents)
+	contents = sanitize_content(contents)
 	local lines = vim.fn.readfile(filepath)
 
 	local prior = {}
@@ -572,16 +632,15 @@ M.tool_definitions = {
 		type = 'function',
 		['function'] = {
 			name = 'edit_file',
-			description = 'Replace lines in a file between start_line and end_line with new contents',
+			description = 'Make a precise edit. oldText must match exactly (copy-paste from read_file output). newText is the replacement. The tool finds oldText in the file and replaces it.',
 			parameters = {
 				type = 'object',
 				properties = {
 					filepath = { type = 'string' },
-					start_line = { type = 'integer' },
-					end_line = { type = 'integer' },
-					contents = { type = 'string', description = 'New content to replace the lines with' },
+					oldText = { type = 'string', description = 'Exact text to replace. Must match the file character-for-character including whitespace. Copy-paste from read_file.' },
+					newText = { type = 'string', description = 'Replacement text. Only the text you want to change — do not include surrounding unchanged lines.' },
 				},
-				required = { 'filepath', 'start_line', 'end_line', 'contents' },
+				required = { 'filepath', 'oldText', 'newText' },
 			},
 		},
 	},
@@ -622,7 +681,7 @@ function M.dispatch(name, args)
 	elseif name == 'read_file' then
 		return M.read_file(args.filepath)
 	elseif name == 'edit_file' then
-		return M.stage_edit(args.filepath, args.start_line, args.end_line, args.contents)
+		return M.edit_file(args.filepath, args.oldText, args.newText)
 	elseif name == 'web_fetch' then
 		return M.web_fetch(args.url, args.query)
 	elseif name == 'done' then
