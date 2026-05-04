@@ -1,5 +1,6 @@
 local M = {}
 local fzf = require('fzf-lua')
+local states = require('ET.states')
 
 function M.select_files(callback)
 	fzf.files({
@@ -19,16 +20,18 @@ function M.select_files(callback)
 end
 
 -- Copy line of codes highlighted using visual mode with absolute path
-function M.select_line_of_codes(opts)
+function M.select_line_of_codes(opts, bufnr)
 	local start_line = opts.line1
 	local end_line = opts.line2
-	local bufname = vim.api.nvim_buf_get_name(0)
+	local buf = bufnr or vim.api.nvim_get_current_buf()
+	local bufname = vim.api.nvim_buf_get_name(buf)
 	local abs = vim.fn.fnamemodify(bufname, ':p')
-	local anchor
-	anchor = string.format('#L%d-L%d', start_line, end_line)
+	local anchor = string.format('#L%d-L%d', start_line, end_line)
 
-	-- TODO: parse into Agent
-	local out = abs .. anchor
+	local content_lines = vim.api.nvim_buf_get_lines(buf, start_line - 1, end_line, false)
+	local content = table.concat(content_lines, '\n')
+
+	local out = abs .. anchor .. '\n```\n' .. content .. '\n```'
 	return out
 end
 
@@ -51,36 +54,110 @@ end
 
 function M.read_file(filepath)
 	local lines = vim.fn.readfile(filepath)
+	if not lines then
+		return nil
+	end
+
+	local pending = {}
+	for _, edit in ipairs(states.pending_edits) do
+		if edit.filepath == filepath then
+			table.insert(pending, edit)
+		end
+	end
+
+	if #pending > 0 then
+		table.sort(pending, function(a, b)
+			return (a.start_line or 0) > (b.start_line or 0)
+		end)
+
+		for _, edit in ipairs(pending) do
+			local content = edit.new_content
+			if type(content) == 'string' then
+				content = #content > 0 and vim.split(content, '\n') or { '' }
+			end
+
+			if edit.type == 'write' then
+				lines = content
+			elseif edit.type == 'edit' then
+				local result = {}
+				for i = 1, edit.start_line - 1 do
+					table.insert(result, lines[i] or '')
+				end
+				for _, l in ipairs(content) do
+					table.insert(result, l)
+				end
+				for i = edit.end_line + 1, #lines do
+					table.insert(result, lines[i])
+				end
+				lines = result
+			end
+		end
+	end
+
+	return table.concat(lines, '\n')
+end
+
+function M.stage_edit(filepath, start_line, end_line, contents)
+	local lines = vim.fn.readfile(filepath)
+	if not lines then
+		return { error = 'Failed to read file: ' .. filepath }
+	end
+
+	local old_lines = {}
+	for i = start_line, end_line do
+		table.insert(old_lines, lines[i] or '')
+	end
+	local old_content = table.concat(old_lines, '\n')
+
+	table.insert(states.pending_edits, {
+		type = 'edit',
+		filepath = filepath,
+		start_line = start_line,
+		end_line = end_line,
+		old_content = old_content,
+		new_content = contents,
+	})
+
+	return { staged = true }
+end
+
+function M.stage_write(filepath, contents)
+	local old_content = ''
+	local lines = vim.fn.readfile(filepath)
 	if lines then
-		return table.concat(lines, '\n')
+		old_content = table.concat(lines, '\n')
 	end
+
+	table.insert(states.pending_edits, {
+		type = 'write',
+		filepath = filepath,
+		old_content = old_content,
+		new_content = contents,
+	})
+
+	return { staged = true }
 end
 
--- Open file with temp buffer, replace contents within start_line & end_line
-function M.edit_file(filepath, start_line, end_line, contents)
-	local bufnr = vim.fn.bufadd(filepath)
-	vim.fn.bufload(bufnr)
+function M.apply_edits(accepted)
+	for _, edit in ipairs(accepted) do
+		local bufnr = vim.fn.bufadd(edit.filepath)
+		vim.fn.bufload(bufnr)
 
-	if type(contents) == 'string' then
-		contents = vim.split(contents, '\n')
+		local content = edit.new_content
+		if type(content) == 'string' then
+			content = #content > 0 and vim.split(content, '\n') or { '' }
+		end
+
+		if edit.type == 'edit' then
+			vim.api.nvim_buf_set_lines(bufnr, edit.start_line - 1, edit.end_line, false, content)
+		elseif edit.type == 'write' then
+			vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
+		end
+
+		vim.api.nvim_buf_call(bufnr, function()
+			vim.cmd('write')
+		end)
 	end
-
-	vim.api.nvim_buf_set_lines(bufnr, start_line - 1, end_line, false, contents)
-
-	vim.api.nvim_buf_call(bufnr, function()
-		vim.cmd('write')
-	end)
-
-	return true
-end
-
-function M.write_file(filepath, contents)
-	if type(contents) == 'string' then
-		contents = vim.split(contents, '\n')
-	end
-
-	local result = vim.fn.writefile(contents, filepath)
-	return result == 0
 end
 
 ---------------------------------- External Tools -----------------------------------------------
@@ -211,4 +288,104 @@ function M.use_context7(ctx7_type, query_content, library_id)
 
 	return decoded
 end
+
+M.tool_definitions = {
+	{
+		type = 'function',
+		['function'] = {
+			name = 'find_files',
+			description = 'Find files by name pattern in the project directory',
+			parameters = {
+				type = 'object',
+				properties = {
+					filenames = {
+						type = 'array',
+						items = { type = 'string' },
+						description = 'List of filenames or glob patterns to search for',
+					},
+				},
+				required = { 'filenames' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
+			name = 'read_file',
+			description = 'Read the contents of a file',
+			parameters = {
+				type = 'object',
+				properties = {
+					filepath = {
+						type = 'string',
+						description = 'Absolute path to the file',
+					},
+				},
+				required = { 'filepath' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
+			name = 'edit_file',
+			description = 'Replace lines in a file between start_line and end_line with new contents',
+			parameters = {
+				type = 'object',
+				properties = {
+					filepath = { type = 'string' },
+					start_line = { type = 'integer' },
+					end_line = { type = 'integer' },
+					contents = { type = 'string', description = 'New content to replace the lines with' },
+				},
+				required = { 'filepath', 'start_line', 'end_line', 'contents' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
+			name = 'write_file',
+			description = 'Write contents to a file (creates or overwrites)',
+			parameters = {
+				type = 'object',
+				properties = {
+					filepath = { type = 'string' },
+					contents = { type = 'string', description = 'Content to write to the file' },
+				},
+				required = { 'filepath', 'contents' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
+			name = 'done',
+			description = 'Call when the task is complete. Summarize what was accomplished.',
+			parameters = {
+				type = 'object',
+				properties = {
+					message = { type = 'string', description = 'Summary of what was done' },
+				},
+				required = { 'message' },
+			},
+		},
+	},
+}
+
+function M.dispatch(name, args)
+	if name == 'find_files' then
+		return M.find_files(args.filenames)
+	elseif name == 'read_file' then
+		return M.read_file(args.filepath)
+	elseif name == 'edit_file' then
+		return M.stage_edit(args.filepath, args.start_line, args.end_line, args.contents)
+	elseif name == 'write_file' then
+		return M.stage_write(args.filepath, args.contents)
+	elseif name == 'done' then
+		return { stop = true, message = args.message or 'Task completed' }
+	end
+	return { error = 'Unknown tool: ' .. tostring(name) }
+end
+
 return M

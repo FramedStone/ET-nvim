@@ -42,6 +42,7 @@
     - [ ] vimdiff
     - [ ] using jq for tools result cherry picking
     - [ ] temp buffer for pr
+- [ ] decouple modules and simplify
 - [ ] doc and readme update
 - [ ] quickfix integration
 - [ ] diagnosis integration
