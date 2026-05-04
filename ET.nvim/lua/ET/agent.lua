@@ -111,6 +111,117 @@ local function get_popup_content()
 	return table.concat(lines, '\n'):gsub('^%s*(.-)%s*$', '%1')
 end
 
+-- Shows paginated web_fetch results popup after agent completes.
+-- Exposed as M.show_web_fetch_results for :ETWebFetchResults command.
+function M.show_web_fetch_results()
+	local results = states.web_fetch_history
+	if #results == 0 then
+		vim.notify('ET.nvim: No web_fetch results to show', vim.log.levels.WARN)
+		return
+	end
+
+	-- Close existing popup if any
+	if states.ui.web_fetch_popup then
+		pcall(states.ui.web_fetch_popup.unmount, states.ui.web_fetch_popup)
+		ui._active_components[states.ui.web_fetch_popup] = nil
+		states.ui.web_fetch_popup = nil
+	end
+
+	local current_index = 1
+	local popup = ui.create_popup('Web Fetch Results', '85%', '80%')
+	states.ui.web_fetch_popup = popup
+	states.ui.web_fetch_popup_index = 1
+
+	local function render_page(idx)
+		local page = results[idx]
+		local header = string.format('Page %d/%d \226\128\148 URL: %s', idx, #results, page.url)
+		local title_line = 'Title: ' .. (page.title ~= '' and page.title or '(no title)')
+		local meta = string.format('Lines: %d cached / %d total%s',
+			#page.lines, page.total_lines, page.truncated and ' (truncated)' or '')
+		local sep = string.rep('\226\148\128', 60)
+
+		local content_lines = {
+			header,
+			title_line,
+			meta,
+			sep,
+			'',
+		}
+		-- Show first 500 lines in the popup (full content is in results)
+		local show_count = math.min(500, #page.lines)
+		for i = 1, show_count do
+			table.insert(content_lines, page.lines[i])
+		end
+		if show_count < #page.lines then
+			table.insert(content_lines, '')
+			table.insert(content_lines, string.format('... %d more lines (use web_fetch(url, "query") to search)', #page.lines - show_count))
+		end
+
+		vim.api.nvim_buf_set_option(popup.bufnr, 'modifiable', true)
+		vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, content_lines)
+		vim.api.nvim_buf_set_option(popup.bufnr, 'modifiable', false)
+		vim.api.nvim_buf_set_option(popup.bufnr, 'readonly', true)
+
+		pcall(vim.api.nvim_win_set_cursor, popup.winid, { 1, 0 })
+		states.ui.web_fetch_popup_index = idx
+	end
+
+	render_page(1)
+
+	local function nav_next()
+		if current_index < #results then
+			current_index = current_index + 1
+			render_page(current_index)
+		end
+	end
+
+	local function nav_prev()
+		if current_index > 1 then
+			current_index = current_index - 1
+			render_page(current_index)
+		end
+	end
+
+	local function close()
+		if popup.bufnr and vim.api.nvim_buf_is_valid(popup.bufnr) then
+			pcall(popup.unmount, popup)
+		end
+		ui._active_components[popup] = nil
+		states.ui.web_fetch_popup = nil
+	end
+
+	local function add_to_prompt()
+		local page = results[current_index]
+		local text = vim.fn.json_encode({
+			source = 'web_fetch',
+			url = page.url,
+			title = page.title,
+		})
+		M.add(text)
+		vim.notify('ET.nvim: Added web_fetch result to prompt context', vim.log.levels.INFO)
+	end
+
+	local function add_to_system_prompt()
+		local page = results[current_index]
+		local text = vim.fn.json_encode({
+			source = 'web_fetch',
+			url = page.url,
+			title = page.title,
+		})
+		states.add_to_system_prompt(text)
+		vim.notify('ET.nvim: Added web_fetch result to system prompt', vim.log.levels.INFO)
+	end
+
+	popup:map('n', 'l', nav_next, { noremap = true, nowait = true })
+	popup:map('n', 'h', nav_prev, { noremap = true, nowait = true })
+	popup:map('n', 'q', close, { noremap = true, nowait = true })
+	popup:map('n', ':q<CR>', close, { noremap = true, nowait = true })
+	popup:map('n', 'a', add_to_prompt, { noremap = true, nowait = true })
+	popup:map('n', 'A', add_to_system_prompt, { noremap = true, nowait = true })
+	popup:map('n', ':w<CR>', function() vim.cmd('ETAddToPrompt') end, { noremap = true, nowait = true })
+	popup:map('n', ':wq<CR>', function() vim.cmd('ETAddToSystemPrompt') end, { noremap = true, nowait = true })
+end
+
 -- Agent prompt loop (tool-only, no streaming to UI)
 function M.prompt()
 	local user_input = get_popup_content()
@@ -125,6 +236,9 @@ function M.prompt()
 		states.ui.chat_popup = nil
 	end
 	states.ui.chat_buffer_lines = {}
+
+	-- Clear previous web_fetch history for fresh agent run
+	states.web_fetch_history = {}
 
 	vim.notify('ET.nvim: Processing...', vim.log.levels.INFO)
 
@@ -193,8 +307,12 @@ function M.prompt()
 				states._current_prompt_context = {}
 				if #states.pending_edits > 0 then
 					local review = require('ET.review')
-					review.review(states.pending_edits)
-					states.pending_edits = {}
+					review.review(states.pending_edits, function()
+						states.pending_edits = {}
+						M.show_web_fetch_results()
+					end)
+				else
+					M.show_web_fetch_results()
 				end
 				return
 			end
@@ -210,8 +328,12 @@ function M.prompt()
 
 			if #states.pending_edits > 0 then
 				local review = require('ET.review')
-				review.review(states.pending_edits)
-				states.pending_edits = {}
+				review.review(states.pending_edits, function()
+					states.pending_edits = {}
+					M.show_web_fetch_results()
+				end)
+			else
+				M.show_web_fetch_results()
 			end
 		end, { tools = tools.tool_definitions })
 	end

@@ -26,19 +26,15 @@ M.ui = {
 	docs_input = nil,
 	bravesearch_result_tree = nil,
 	bravesearch_result_popup = nil,
+	web_fetch_popup = nil,
+	web_fetch_popup_index = 1,
 }
 
 -- Staged edits pending review
 M.pending_edits = {}
 
--- Web page cache (session-only, single page at a time)
-M.current_page = {
-	url = '',
-	title = '',
-	lines = {},
-	total_lines = 0,
-	truncated = false,
-}
+-- Web page cache (session-only, accumulates across agent calls)
+M.web_fetch_history = {}
 
 -- Persistence helpers
 local function get_project_hash()
