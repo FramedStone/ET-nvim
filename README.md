@@ -1,8 +1,8 @@
 # Human-First Neovim AI Agent made for [oMLX](https://github.com/jundot/omlx)
-- onboard flow
+- knowledge setup
 - stateless agent
 - tools
-    - vim read, edit, write
+    - vim find, read, edit
     - brave search
     - context7
 - quickfix integration

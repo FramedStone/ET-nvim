@@ -4,6 +4,7 @@ local states = require('ET.states')
 
 function M.select_files(callback)
 	fzf.files({
+		winopts = { zindex = 300 },
 		actions = {
 			['default'] = function(selected)
 				local paths = {}
@@ -33,6 +34,24 @@ function M.select_line_of_codes(opts, bufnr)
 
 	local out = abs .. anchor .. '\n```\n' .. content .. '\n```'
 	return out
+end
+
+-- Receive filename(s), return absolute path(s)
+function M.find_files(filenames)
+	local results = {}
+	for _, filename in ipairs(filenames) do
+		local output = vim.fn.system(string.format('find . -name "%s"', filename))
+		if output and output ~= '' then
+			for _, path in ipairs(vim.split(output, '\n')) do
+				if path ~= '' then
+					local abs_path = vim.fn.fnamemodify(path, ':p')
+					table.insert(results, abs_path)
+				end
+			end
+		end
+	end
+
+	return results
 end
 
 local function get_virtualized_lines(filepath)
@@ -67,9 +86,7 @@ local function get_virtualized_lines(filepath)
 			content = #content > 0 and vim.split(content, '\n') or { '' }
 		end
 
-		if edit.type == 'write' then
-			lines = content
-		elseif edit.type == 'edit' then
+		if edit.type == 'edit' then
 			local result = {}
 			for i = 1, edit.start_line - 1 do
 				table.insert(result, lines[i] or '')
@@ -129,8 +146,7 @@ function M.stage_edit(filepath, start_line, end_line, contents)
 				if start_line <= virt_end and end_line >= edit.start_line then
 					return { error = 'This region overlaps with a pending edit. Call read_file first to see the current state.' }
 				end
-			elseif edit.type == 'write' then
-				return { error = 'Pending write exists for this file. Call read_file first to see the current state.' }
+
 			end
 		end
 
@@ -170,23 +186,6 @@ function M.stage_edit(filepath, start_line, end_line, contents)
 	return { staged = true }
 end
 
-function M.stage_write(filepath, contents)
-	local old_content = ''
-	local virt_lines = get_virtualized_lines(filepath)
-	if virt_lines and #virt_lines > 0 then
-		old_content = table.concat(virt_lines, '\n')
-	end
-
-	table.insert(states.pending_edits, {
-		type = 'write',
-		filepath = filepath,
-		old_content = old_content,
-		new_content = contents,
-	})
-
-	return { staged = true }
-end
-
 function M.apply_edits(accepted)
 	for _, edit in ipairs(accepted) do
 		local bufnr = vim.fn.bufadd(edit.filepath)
@@ -197,11 +196,7 @@ function M.apply_edits(accepted)
 			content = #content > 0 and vim.split(content, '\n') or { '' }
 		end
 
-		if edit.type == 'edit' then
-			vim.api.nvim_buf_set_lines(bufnr, edit.start_line - 1, edit.end_line, false, content)
-		elseif edit.type == 'write' then
-			vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
-		end
+		vim.api.nvim_buf_set_lines(bufnr, edit.start_line - 1, edit.end_line, false, content)
 
 		vim.api.nvim_buf_call(bufnr, function()
 			vim.cmd('write')
@@ -342,6 +337,24 @@ M.tool_definitions = {
 	{
 		type = 'function',
 		['function'] = {
+			name = 'find_files',
+			description = 'Find files by name pattern in the project directory',
+			parameters = {
+				type = 'object',
+				properties = {
+					filenames = {
+						type = 'array',
+						items = { type = 'string' },
+						description = 'List of filenames or glob patterns to search for',
+					},
+				},
+				required = { 'filenames' },
+			},
+		},
+	},
+	{
+		type = 'function',
+		['function'] = {
 			name = 'read_file',
 			description = 'Read the contents of a file',
 			parameters = {
@@ -376,21 +389,6 @@ M.tool_definitions = {
 	{
 		type = 'function',
 		['function'] = {
-			name = 'write_file',
-			description = 'Write contents to a file (creates or overwrites)',
-			parameters = {
-				type = 'object',
-				properties = {
-					filepath = { type = 'string' },
-					contents = { type = 'string', description = 'Content to write to the file' },
-				},
-				required = { 'filepath', 'contents' },
-			},
-		},
-	},
-	{
-		type = 'function',
-		['function'] = {
 			name = 'done',
 			description = 'Call when the task is complete. Summarize what was accomplished.',
 			parameters = {
@@ -405,12 +403,12 @@ M.tool_definitions = {
 }
 
 function M.dispatch(name, args)
-	if name == 'read_file' then
+	if name == 'find_files' then
+		return M.find_files(args.filenames)
+	elseif name == 'read_file' then
 		return M.read_file(args.filepath)
 	elseif name == 'edit_file' then
 		return M.stage_edit(args.filepath, args.start_line, args.end_line, args.contents)
-	elseif name == 'write_file' then
-		return M.stage_write(args.filepath, args.contents)
 	elseif name == 'done' then
 		return { stop = true, message = args.message or 'Task completed' }
 	end

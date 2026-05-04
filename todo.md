@@ -13,7 +13,6 @@
     - find
     - read
     - edit
-    - write
 - [x] external tools
    - bravesearch
    - context7
