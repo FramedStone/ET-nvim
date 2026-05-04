@@ -38,7 +38,9 @@ end
 -- Receive filename(s), return absolute path(s)
 function M.find_files(filenames)
 	local results = {}
+	local basename_set = {}
 	for _, filename in ipairs(filenames) do
+		basename_set[vim.fn.fnamemodify(filename, ':t')] = true
 		local output = vim.fn.system(string.format('find . -name "%s"', filename))
 		if output and output ~= '' then
 			for _, path in ipairs(vim.split(output, '\n')) do
@@ -49,14 +51,29 @@ function M.find_files(filenames)
 			end
 		end
 	end
+
+	for _, edit in ipairs(states.pending_edits) do
+		if edit.type == 'write' and basename_set[vim.fn.fnamemodify(edit.filepath, ':t')] then
+			if vim.fn.filereadable(edit.filepath) == 0 then
+				local found = false
+				for _, r in ipairs(results) do
+					if r == edit.filepath then
+						found = true
+						break
+					end
+				end
+				if not found then
+					table.insert(results, edit.filepath)
+				end
+			end
+		end
+	end
+
 	return results
 end
 
-function M.read_file(filepath)
+local function get_virtualized_lines(filepath)
 	local lines = vim.fn.readfile(filepath)
-	if not lines then
-		return nil
-	end
 
 	local pending = {}
 	for _, edit in ipairs(states.pending_edits) do
@@ -65,42 +82,111 @@ function M.read_file(filepath)
 		end
 	end
 
-	if #pending > 0 then
-		table.sort(pending, function(a, b)
-			return (a.start_line or 0) > (b.start_line or 0)
-		end)
+	if not lines and #pending == 0 then
+		return nil
+	end
 
-		for _, edit in ipairs(pending) do
-			local content = edit.new_content
-			if type(content) == 'string' then
-				content = #content > 0 and vim.split(content, '\n') or { '' }
-			end
+	if not lines then
+		lines = {}
+	end
 
-			if edit.type == 'write' then
-				lines = content
-			elseif edit.type == 'edit' then
-				local result = {}
-				for i = 1, edit.start_line - 1 do
-					table.insert(result, lines[i] or '')
-				end
-				for _, l in ipairs(content) do
-					table.insert(result, l)
-				end
-				for i = edit.end_line + 1, #lines do
-					table.insert(result, lines[i])
-				end
-				lines = result
+	if #pending == 0 then
+		return lines
+	end
+
+	table.sort(pending, function(a, b)
+		return (a.start_line or 0) > (b.start_line or 0)
+	end)
+
+	for _, edit in ipairs(pending) do
+		local content = edit.new_content
+		if type(content) == 'string' then
+			content = #content > 0 and vim.split(content, '\n') or { '' }
+		end
+
+		if edit.type == 'write' then
+			lines = content
+		elseif edit.type == 'edit' then
+			local result = {}
+			for i = 1, edit.start_line - 1 do
+				table.insert(result, lines[i] or '')
 			end
+			for _, l in ipairs(content) do
+				table.insert(result, l)
+			end
+			for i = edit.end_line + 1, #lines do
+				table.insert(result, lines[i])
+			end
+			lines = result
 		end
 	end
 
+	return lines
+end
+
+function M.read_file(filepath)
+	local lines = get_virtualized_lines(filepath)
+	if not lines then
+		return nil
+	end
 	return table.concat(lines, '\n')
 end
 
 function M.stage_edit(filepath, start_line, end_line, contents)
 	local lines = vim.fn.readfile(filepath)
-	if not lines then
+
+	local prior = {}
+	for _, edit in ipairs(states.pending_edits) do
+		if edit.filepath == filepath then
+			table.insert(prior, edit)
+		end
+	end
+
+	if not lines and #prior == 0 then
 		return { error = 'Failed to read file: ' .. filepath }
+	end
+
+	if #prior > 0 then
+		local virt_lines = get_virtualized_lines(filepath)
+
+		for _, edit in ipairs(prior) do
+			if edit.type == 'edit' then
+				local n_lines = 0
+				local nc = edit.new_content
+				if type(nc) == 'string' then
+					n_lines = #vim.split(nc, '\n')
+				else
+					n_lines = #nc
+				end
+				local delta = n_lines - (edit.end_line - edit.start_line + 1)
+				if delta ~= 0 and edit.end_line < start_line then
+					return { error = 'Pending edits have changed line numbers in this file. Call read_file first to see the current state.' }
+				end
+				local virt_end = edit.start_line + n_lines - 1
+				if start_line <= virt_end and end_line >= edit.start_line then
+					return { error = 'This region overlaps with a pending edit. Call read_file first to see the current state.' }
+				end
+			elseif edit.type == 'write' then
+				return { error = 'Pending write exists for this file. Call read_file first to see the current state.' }
+			end
+		end
+
+		local old_lines = {}
+		for i = start_line, end_line do
+			table.insert(old_lines, virt_lines[i] or '')
+		end
+		local old_content = table.concat(old_lines, '\n')
+
+		table.insert(states.pending_edits, {
+			type = 'edit',
+			filepath = filepath,
+			start_line = start_line,
+			end_line = end_line,
+			old_content = old_content,
+			new_content = contents,
+		})
+
+		return { staged = true }
 	end
 
 	local old_lines = {}
@@ -123,9 +209,9 @@ end
 
 function M.stage_write(filepath, contents)
 	local old_content = ''
-	local lines = vim.fn.readfile(filepath)
-	if lines then
-		old_content = table.concat(lines, '\n')
+	local virt_lines = get_virtualized_lines(filepath)
+	if virt_lines and #virt_lines > 0 then
+		old_content = table.concat(virt_lines, '\n')
 	end
 
 	table.insert(states.pending_edits, {
