@@ -301,7 +301,7 @@ Workflow:
   3. Press `:w<CR>` to search
   4. Enter a result count (default: 5)
   5. Browse results in the tree
-  6. Press `l` or Enter on a result to open its URL in the browser
+  6. Press Enter on a result to open its URL in the browser
 
 Results can be added to the agent's context:
   - Focus the result tree
@@ -338,7 +338,7 @@ Workflow:
      ─ this copies the library ID to the right panel
   4. Type a docs query in the right query input, press `:w<CR>`
   5. Browse documentation snippets in the right tree
-  6. Press `l` or Enter on a snippet to open it in the browser
+  6. Press Enter on a snippet to open it in the browser
 
 Results can be added to the agent's context via `:ETAddToSystemPrompt`
 or `:ETAddToPrompt` from either tree.
@@ -370,9 +370,6 @@ the run.
 Navigation:
   `l`       Next page
   `h`       Previous page
-  `a`       Add current page metadata to prompt context (one-shot)
-  `A`       Add current page metadata to system prompt (persistent)
-  `:w<CR>`  Add to prompt context (same as `a` in this popup)
   `q`       Close
 
 Each page shows: URL, title, line count, and first 500 lines (with a
@@ -454,10 +451,8 @@ Standard in all ET.nvim popups: >
                                               *ET-keybindings-trees*
 Tree components (search results): >
 
-  l, <CR>       Expand node / open URL (on leaf nodes)
-  h             Collapse node
-  j             Next item
-  k             Previous item
+  <CR>         Open URL (on leaf) / toggle (on parent)
+  t            Toggle expand / collapse node
 <
                                               *ET-keybindings-review*
 Edit review (vimdiff): >

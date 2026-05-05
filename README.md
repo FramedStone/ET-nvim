@@ -156,39 +156,14 @@ to run `:ETInstallTools`.
 
 ## How It Works
 
-```
-  :ET → type prompt → :w<CR>
-    │
-    ▼
-  ┌──────────────────────────┐
-  │  LLM (streaming)         │
-  │  system: tools-only      │
-  │  user: your prompt       │
-  └──────────┬───────────────┘
-             │ tool calls
-             ▼
-  ┌──────────────────────────┐
-  │  Dispatch each tool:     │
-  │  find_files / read_file  │
-  │  edit_file (staged)      │
-  │  web_fetch (cached)      │
-  └──────────┬───────────────┘
-             │ results
-             ▼
-  ┌──────────────────────────┐
-  │  Loop until "done" tool  │
-  └──────────┬───────────────┘
-             │
-             ▼
-  ┌──────────────────────────┐
-  │  Vimdiff review          │
-  │  Enter = accept          │
-  │  q     = decline         │
-  │  :q<CR> = decline all    │
-  └──────────┬───────────────┘
-             │
-             ▼
-  Edits written to disk
+```mermaid
+flowchart TD
+    A[":ET → type prompt → :w<CR>"] --> B["LLM (streaming)"]
+    B -->|"tool calls"| C["Dispatch tools:<br/>find_files / read_file<br/>edit_file (staged)<br/>web_fetch (cached)"]
+    C -->|"results"| D{"done?"}
+    D -->|"no, more tools"| B
+    D -->|"yes"| E["Vimdiff review<br/>⏎ accept | q decline | :q decline all<br/>l next | h previous"]
+    E --> F["Edits written to disk"]
 ```
 
 ---
@@ -214,10 +189,8 @@ to run `:ETInstallTools`.
 
 | Key | Action |
 |-----|--------|
-| `l`, `<CR>` | Expand node / open URL (on leaf) |
-| `h` | Collapse node |
-| `j` | Next item |
-| `k` | Previous item |
+| `<CR>` | Open URL (on leaf) / toggle (on parent) |
+| `t` | Toggle expand / collapse node |
 
 ### Web Fetch Results
 
@@ -225,8 +198,6 @@ to run `:ETInstallTools`.
 |-----|--------|
 | `l` | Next page |
 | `h` | Previous page |
-| `a` | Add current page to prompt context |
-| `A` | Add current page to system prompt |
 
 ### Edit Review (vimdiff)
 
