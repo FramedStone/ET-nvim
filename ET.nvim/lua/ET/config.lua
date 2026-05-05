@@ -31,20 +31,21 @@ function M.get_config()
 	return config
 end
 
-function M.set_config(cfg)
-	if cfg then
-		if vim.fn.filereadable(path) == 0 then
-			local dir = vim.fn.stdpath('config') .. '/.et'
-			if vim.fn.isdirectory(dir) == 0 then
-				vim.fn.mkdir(dir, 'p')
-			end
-		end
-		local json = vim.fn.json_encode(cfg)
-		vim.fn.writefile({ json }, path)
-		vim.fn.system('fixjson --write ' .. path)
-		return
+local function ensure_dir()
+	local dir = vim.fn.stdpath('config') .. '/.et'
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, 'p')
 	end
+end
 
+function M.save_config(cfg)
+	ensure_dir()
+	local json = vim.fn.json_encode(cfg)
+	vim.fn.writefile({ json }, path)
+	vim.fn.system('fixjson --write ' .. path)
+end
+
+function M.edit_config_ui()
 	local current = M.get_config()
 	local current_json = vim.fn.json_encode(current)
 	local temp = '/tmp/et_config_temp.json'
@@ -54,24 +55,18 @@ function M.set_config(cfg)
 	local height = #formatted
 
 	local p = ui.create_popup('Edit Settings', '60%', height)
-
 	vim.api.nvim_buf_set_lines(p.bufnr, 0, -1, false, formatted)
-
 	vim.api.nvim_buf_set_option(p.bufnr, 'relativenumber', true)
 
-	local function save_and_close()
+	ui.bind_save_close_keys(p, function()
 		local lines = vim.api.nvim_buf_get_lines(p.bufnr, 0, -1, false)
 		local content = table.concat(lines, '\n')
 		local ok, decoded = pcall(vim.fn.json_decode, content)
 		if ok then
-			M.set_config(decoded)
+			M.save_config(decoded)
 		else
 			vim.notify('ET.nvim: Invalid JSON', vim.log.levels.ERROR)
 		end
-	end
-
-	ui.bind_save_close_keys(p, function()
-		save_and_close()
 		p:unmount()
 	end)
 end

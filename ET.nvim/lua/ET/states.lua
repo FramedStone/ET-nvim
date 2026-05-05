@@ -8,13 +8,8 @@ M._system_prompt_additions = {}
 -- One-shot, cleared after prompt() call
 M._current_prompt_context = {}
 
--- Tool results
-M.bravesearch = { results = {}, selected_type = 'web' }
-M.context7 = {
-	library_results = {},
-	docs_code_snippets = {},
-	docs_info_snippets = {},
-}
+-- Tool results (state for UI cross-command access)
+M.bravesearch = { selected_type = 'web' }
 
 -- UI references
 M.ui = {
@@ -106,16 +101,6 @@ function M.get_prompt_context()
 	local context = table.concat(M._current_prompt_context, '\n\n')
 	M._current_prompt_context = {}
 	return context
-end
-
--- Tool results
-function M.set_bravesearch_results(results)
-	M.bravesearch.results = results or {}
-end
-
-function M.set_context7_docs(code_snippets, info_snippets)
-	M.context7.docs_code_snippets = code_snippets or {}
-	M.context7.docs_info_snippets = info_snippets or {}
 end
 
 -- Initialize: load persisted state
