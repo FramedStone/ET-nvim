@@ -288,6 +288,11 @@ function M.setup_external_tools()
 		end
 	end
 
+	-- fixjson
+	if not has('fixjson') then
+		table.insert(cmds, 'npm install -g fixjson')
+	end
+
 	if #cmds == 0 then
 		vim.notify('ET.nvim: All external tools are already installed', vim.log.levels.INFO)
 		return
