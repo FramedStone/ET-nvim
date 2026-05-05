@@ -35,9 +35,6 @@
 - [x] system prompt to tell ET just use tools without any chatting (explain to ET it's in an environment where chatting response is not needed, only tool calling)
 - [x] verbose tool calling message via vim.notify('ET.nvim: calling tool-name')
 - [x] webfetch cherry pick result
-- [ ] codebase based bravesearch & ctx7 (so that it has the prior knowledge)
-    - notify user bx and ctx7 is not setup the knowledge is default model knowledge (ETSetupKnowledge)
-    - check for updates (ETKnowledgeSync - just use the same commands to replace with latest knowledge)
 - [x] wire file picker and range selector into ET
 - [x] wire nvim tools
 - [x] pr flow for any edits

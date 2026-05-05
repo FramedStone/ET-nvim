@@ -2,9 +2,66 @@ local M = {}
 local Layout = require('nui.layout')
 local Popup = require('nui.popup')
 local Menu = require('nui.menu')
+local Input = require('nui.input')
 local Tree = require('nui.tree')
 local Line = require('nui.line')
 local event = require('nui.utils.autocmd').event
+
+-- Trim leading/trailing whitespace from a string
+function M.trim(str)
+	return (str or ''):gsub('^%s*(.-)%s*$', '%1')
+end
+
+-- Focus a popup's window and move cursor to the last line
+function M.focus_last_line(popup)
+	popup = popup.winid and popup or (popup and popup.popup or nil) -- accept popup directly or opts table
+	if not popup or not popup.winid then
+		return
+	end
+	vim.schedule(function()
+		if popup.winid then
+			vim.api.nvim_set_current_win(popup.winid)
+			local last = vim.api.nvim_buf_line_count(popup.bufnr)
+			vim.api.nvim_win_set_cursor(popup.winid, { last, 0 })
+		end
+	end)
+end
+
+-- Prompt user for a numeric count, then call callback(count)
+function M.prompt_count(callback, default)
+	default = default or 5
+	local input = Input({
+		relative = 'cursor',
+		position = { row = 1, col = 0 },
+		size = 25,
+		zindex = 200,
+		border = { style = 'rounded', text = { top = '[Result Count]', top_align = 'left' } },
+		win_options = { winhighlight = 'Normal:Normal,FloatBorder:Normal' },
+	}, {
+		prompt = 'count: ',
+		default_value = tostring(default),
+		on_submit = function(value)
+			local count = tonumber(value) or default
+			if count < 1 then count = default end
+			callback(count)
+		end,
+	})
+	input:map('n', '<Esc>', function()
+		input:unmount()
+	end, { noremap = true, nowait = true })
+	input:mount()
+end
+
+-- Bind standard save/close keymaps to a nui popup
+-- on_save: called on :w<CR> or :wq<CR>
+-- on_close: called on q or :q<CR> (defaults to popup:unmount())
+function M.bind_save_close_keys(popup, on_save, on_close)
+	on_close = on_close or function() popup:unmount() end
+	popup:map('n', ':w<CR>', on_save, { noremap = true, nowait = true })
+	popup:map('n', ':wq<CR>', on_save, { noremap = true, nowait = true })
+	popup:map('n', 'q', on_close, { noremap = true, nowait = true })
+	popup:map('n', ':q<CR>', on_close, { noremap = true, nowait = true })
+end
 
 -- Track active components for VimResized auto-resize
 M._active_components = {}
@@ -239,13 +296,29 @@ function M.create_layout(width, height, boxes, direction)
 	return layout, components, boxes
 end
 
+---- Internal helper: toggle a tree node (expand/collapse) if it has children.
+--- Returns true if the node was toggled (it has children), false if it's a leaf.
+local function toggle_tree_node(tree, node)
+	if node and node:has_children() then
+		if node:is_expanded() then
+			node:collapse()
+		else
+			node:expand()
+		end
+		tree:render()
+		return true
+	end
+	return false
+end
+
 --- Creates a NuiTree on a popup's buffer with default node rendering and keymaps.
 --- @param popup table the nui Popup instance to render the tree into
 --- @param placeholder string text shown before results are loaded
 --- @param opts? table optional config
 --- @param opts.prepare_node? fun(node: any): any custom node formatter
 --- @param opts.keymaps? table<string, function|false> key overrides (false to disable)
---- @return NuiTree, table (tree, popup)
+--- @param opts.on_open? fun(node: NuiTree.Node): boolean called on <CR>/l BEFORE toggle; return true to suppress toggle
+--- @return NuiTree tree
 function M.create_tree(popup, placeholder, opts)
 	opts = opts or {}
 
@@ -273,28 +346,26 @@ function M.create_tree(popup, placeholder, opts)
 		prepare_node = prepare_node,
 	})
 
+	-- Shared handler for <CR> and l: try on_open first, fall back to toggle
+	local function activate_node()
+		local node = tree:get_node()
+		if not node then return end
+		-- on_open gets first chance; return true means "handled, don't toggle"
+		if opts.on_open and opts.on_open(node) then
+			return
+		end
+		toggle_tree_node(tree, node)
+	end
+
 	local keymaps = opts.keymaps or {}
 
 	if keymaps.h ~= false then
-		local handler = keymaps.h or function()
-			local node = tree:get_node()
-			if node and node:has_children() and node:is_expanded() then
-				node:collapse()
-				tree:render()
-			end
-		end
+		local handler = keymaps.h or activate_node
 		popup:map('n', 'h', handler, { noremap = true, nowait = true })
 	end
 
 	if keymaps.l ~= false then
-		local handler = keymaps.l or function()
-			local node = tree:get_node()
-			if node and node:has_children() and not node:is_expanded() then
-				node:expand()
-				tree:render()
-			end
-		end
-		popup:map('n', 'l', handler, { noremap = true, nowait = true })
+		popup:map('n', 'l', keymaps.l or activate_node, { noremap = true, nowait = true })
 	end
 
 	if keymaps.j ~= false then
@@ -308,18 +379,7 @@ function M.create_tree(popup, placeholder, opts)
 	end
 
 	if keymaps['<CR>'] ~= false then
-		local handler = keymaps['<CR>'] or function()
-			local node = tree:get_node()
-			if node and node:has_children() then
-				if node:is_expanded() then
-					node:collapse()
-				else
-					node:expand()
-				end
-				tree:render()
-			end
-		end
-		popup:map('n', '<CR>', handler, { noremap = true, nowait = true })
+		popup:map('n', '<CR>', keymaps['<CR>'] or activate_node, { noremap = true, nowait = true })
 	end
 
 	if keymaps['<Esc>'] ~= false then
@@ -329,7 +389,7 @@ function M.create_tree(popup, placeholder, opts)
 
 	tree:render()
 
-	return tree, popup
+	return tree
 end
 
 return M

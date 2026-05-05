@@ -28,14 +28,7 @@ local function register_chat_keymaps(popup)
 		states.ui.chat_popup = nil
 	end
 
-	popup:map('n', 'q', close_chat, { noremap = true, nowait = true })
-	popup:map('n', ':q<CR>', close_chat, { noremap = true, nowait = true })
-	popup:map('n', ':w<CR>', function()
-		M.prompt()
-	end, { noremap = true, nowait = true })
-	popup:map('n', ':wq<CR>', function()
-		M.prompt()
-	end, { noremap = true, nowait = true })
+	ui.bind_save_close_keys(popup, function() M.prompt() end, close_chat)
 end
 
 local function ensure_chat_popup()
@@ -86,13 +79,7 @@ function M.open_chat()
 		end
 	end
 
-	vim.schedule(function()
-		if popup.winid then
-			vim.api.nvim_set_current_win(popup.winid)
-			local last_line = vim.api.nvim_buf_line_count(popup.bufnr)
-			vim.api.nvim_win_set_cursor(popup.winid, { last_line, 0 })
-		end
-	end)
+	ui.focus_last_line(popup)
 	return popup
 end
 
@@ -108,7 +95,7 @@ local function get_popup_content()
 		return ''
 	end
 	local lines = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
-	return table.concat(lines, '\n'):gsub('^%s*(.-)%s*$', '%1')
+	return ui.trim(table.concat(lines, '\n'))
 end
 
 -- Shows paginated web_fetch results popup after agent completes.
@@ -221,16 +208,9 @@ function M.show_web_fetch_results()
 
 	popup:map('n', 'l', nav_next, { noremap = true, nowait = true })
 	popup:map('n', 'h', nav_prev, { noremap = true, nowait = true })
-	popup:map('n', 'q', close, { noremap = true, nowait = true })
-	popup:map('n', ':q<CR>', close, { noremap = true, nowait = true })
+	ui.bind_save_close_keys(popup, function() vim.cmd('ETAddToPrompt') end, close)
 	popup:map('n', 'a', add_to_prompt, { noremap = true, nowait = true })
 	popup:map('n', 'A', add_to_system_prompt, { noremap = true, nowait = true })
-	popup:map('n', ':w<CR>', function()
-		vim.cmd('ETAddToPrompt')
-	end, { noremap = true, nowait = true })
-	popup:map('n', ':wq<CR>', function()
-		vim.cmd('ETAddToSystemPrompt')
-	end, { noremap = true, nowait = true })
 end
 
 -- Agent prompt loop (tool-only, no streaming to UI)
