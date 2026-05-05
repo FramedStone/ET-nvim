@@ -120,13 +120,8 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	end
 
 	local cmd = {
-		'curl',
-		'-s',
-		'-N',
-		'-X',
-		'POST',
-		'-H',
-		'Content-Type: application/json',
+		'curl', '-s', '-N', '-X', 'POST',
+		'-H', 'Content-Type: application/json',
 	}
 	if cfg.api_key and cfg.api_key ~= '' then
 		table.insert(cmd, '-H')
@@ -138,80 +133,73 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 
 	local full_content = {}
 	local tool_calls = {}
-	local fired_tools = false
-	local finished = false
+	local state = 'streaming' -- 'streaming' | 'done'
 
-	local function on_stdout(_, data)
-		if data and #data > 0 then
-			for _, line in ipairs(data) do
-				if line:find('^data: ') then
-					local json_str = line:sub(7)
-					if json_str ~= '[DONE]' then
-						local ok, decoded = pcall(vim.fn.json_decode, json_str)
-						if ok and decoded.choices and decoded.choices[1] then
-							local choice = decoded.choices[1]
-							local delta = choice.delta
-
-							if delta then
-								if delta.content then
-									table.insert(full_content, delta.content)
-								end
-
-								if delta.tool_calls then
-									for _, tc in ipairs(delta.tool_calls) do
-										local idx = tc.index + 1
-										if not tool_calls[idx] then
-											tool_calls[idx] = {
-												id = tc.id or '',
-												type = tc.type or 'function',
-												['function'] = {
-													name = tc['function'] and tc['function'].name or '',
-													arguments = '',
-												},
-											}
-										end
-										if tc.id and tc.id ~= '' then
-											tool_calls[idx].id = tc.id
-										end
-										if tc['function'] and tc['function'].name and tc['function'].name ~= '' then
-											tool_calls[idx]['function'].name = tc['function'].name
-										end
-										if tc['function'] and tc['function'].arguments then
-											tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. tc['function'].arguments
-										end
-									end
-								end
-							end
-
-						if choice.finish_reason == 'tool_calls' then
-							if on_tool_call then
-								on_tool_call(tool_calls)
-								tool_calls = {}
-								fired_tools = true
-							end
-							return
-						elseif choice.finish_reason == 'stop' then
-							if on_done and not finished then
-								finished = true
-								on_done(table.concat(full_content))
-							end
-							return
-						end
-						end
-					end
-				end
-			end
+	-- Merge a streaming delta chunk into the accumulated tool_calls array
+	local function accumulate_tool_call(tc)
+		local idx = tc.index + 1
+		if not tool_calls[idx] then
+			tool_calls[idx] = {
+				id = tc.id or '',
+				type = tc.type or 'function',
+				['function'] = {
+					name = tc['function'] and tc['function'].name or '',
+					arguments = '',
+				},
+			}
+		end
+		if tc.id and tc.id ~= '' then
+			tool_calls[idx].id = tc.id
+		end
+		if tc['function'] and tc['function'].name and tc['function'].name ~= '' then
+			tool_calls[idx]['function'].name = tc['function'].name
+		end
+		if tc['function'] and tc['function'].arguments then
+			tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. tc['function'].arguments
 		end
 	end
 
-	local function on_exit(_, code)
-		if #tool_calls > 0 then
-			if on_tool_call then
+	local function on_stdout(_, data)
+		if not data then return end
+		for _, line in ipairs(data) do
+			if not line:find('^data: ') then goto continue end
+			local json_str = line:sub(7)
+			if json_str == '[DONE]' then goto continue end
+
+			local ok, decoded = pcall(vim.fn.json_decode, json_str)
+			if not (ok and decoded.choices and decoded.choices[1]) then goto continue end
+
+			local choice = decoded.choices[1]
+			local delta = choice.delta
+			if not delta then goto continue end
+
+			if delta.content then
+				table.insert(full_content, delta.content)
+			end
+
+			if delta.tool_calls then
+				for _, tc in ipairs(delta.tool_calls) do
+					accumulate_tool_call(tc)
+				end
+			end
+
+			if choice.finish_reason == 'tool_calls' then
 				on_tool_call(tool_calls)
 				tool_calls = {}
+				state = 'done'
+				return
+			elseif choice.finish_reason == 'stop' then
+				on_done(table.concat(full_content))
+				state = 'done'
+				return
 			end
-		elseif on_done and not fired_tools and not finished then
-			finished = true
+
+			::continue::
+		end
+	end
+
+	local function on_exit()
+		if state ~= 'done' then
 			on_done(table.concat(full_content))
 		end
 	end
