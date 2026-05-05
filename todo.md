@@ -39,7 +39,7 @@
 - [x] wire nvim tools
 - [x] pr flow for any edits
     - vimdiff
-- [ ] refactor codebase: decouple modules and simplify
+- [x] refactor codebase: decouple modules and simplify
 - [ ] doc and readme update
 - [ ] quickfix integration
 - [ ] diagnosis integration
