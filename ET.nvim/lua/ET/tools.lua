@@ -258,18 +258,21 @@ function M.setup_external_tools()
 		if vim.fn.has('mac') then
 			table.insert(cmds, 'brew install jq')
 		elseif vim.fn.has('win32') then
-			table.insert(cmds, 'choco install jq -y')
+			-- winget is built into Windows 10+ (no extra package manager needed)
+			table.insert(cmds, 'winget install jqlang.jq --accept-package-agreements --accept-source-agreements')
 		else
 			table.insert(cmds, 'sudo apt-get install -y jq')
 		end
 	end
 
-	-- lynx
+	-- lynx (optional on Windows — web_fetch has a Lua fallback)
 	if not has('lynx') then
 		if vim.fn.has('mac') then
 			table.insert(cmds, 'brew install lynx')
 		elseif vim.fn.has('win32') then
-			table.insert(cmds, 'choco install lynx -y')
+			-- lynx is not easily available on Windows; the Lua fallback handles it.
+			-- User can install manually from https://lynx.invisible-island.net/
+			vim.notify('ET.nvim: lynx not available on Windows — web_fetch will use Lua fallback', vim.log.levels.WARN)
 		else
 			table.insert(cmds, 'sudo apt-get install -y lynx')
 		end
