@@ -33,6 +33,9 @@ function M.setup(opts)
 	if vim.fn.executable('lynx') == 0 then
 		table.insert(missing, 'lynx (html-to-text for web_fetch)')
 	end
+	if vim.fn.executable('fixjson') == 0 then
+		table.insert(missing, 'fixjson (json formatter)')
+	end
 
 	if #missing > 0 then
 		vim.notify(string.rep('=', 20) .. ' ET.nvim ' .. string.rep('=', 20))
