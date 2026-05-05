@@ -10,7 +10,9 @@ function M.review(edits, on_complete)
 	local saved_buf = vim.api.nvim_get_current_buf()
 	local accepted = {}
 
-	local function finish()
+	local self = {}
+
+	function self.finish()
 		pcall(vim.cmd, 'diffoff!')
 		pcall(vim.cmd, 'only')
 
@@ -33,10 +35,64 @@ function M.review(edits, on_complete)
 		if on_complete then on_complete() end
 	end
 
-	local function show_diff(index)
+	function self.bind_keys(old_buf, new_buf, index)
+		local function next_undecided(start)
+			local next = start + 1
+			while next <= #edits and accepted[next] ~= nil do
+				next = next + 1
+			end
+			self.show_diff(next)
+		end
+
+		local function accept()
+			accepted[index] = true
+			for i = 1, index - 1 do
+				if accepted[i] == nil then
+					self.show_diff(i)
+					return
+				end
+			end
+			next_undecided(index)
+		end
+
+		local function decline()
+			accepted[index] = false
+			for i = 1, index - 1 do
+				if accepted[i] == nil then
+					self.show_diff(i)
+					return
+				end
+			end
+			next_undecided(index)
+		end
+
+		local function decline_all()
+			for i = index, #edits do
+				accepted[i] = false
+			end
+			self.finish()
+		end
+
+		local function set_kmap(buf, key, cb)
+			vim.keymap.set('n', key, cb, { buffer = buf, noremap = true, nowait = true, silent = true })
+		end
+
+		set_kmap(old_buf, '<CR>', accept)
+		set_kmap(new_buf, '<CR>', accept)
+		set_kmap(old_buf, 'q', decline)
+		set_kmap(new_buf, 'q', decline)
+		set_kmap(old_buf, ':q<CR>', decline_all)
+		set_kmap(new_buf, ':q<CR>', decline_all)
+		set_kmap(old_buf, 'l', function() self.show_diff(index + 1) end)
+		set_kmap(new_buf, 'l', function() self.show_diff(index + 1) end)
+		set_kmap(old_buf, 'h', function() self.show_diff(index - 1) end)
+		set_kmap(new_buf, 'h', function() self.show_diff(index - 1) end)
+	end
+
+	function self.show_diff(index)
 		if index < 1 then index = 1 end
 		if index > #edits then
-			finish()
+			self.finish()
 			return
 		end
 
@@ -82,64 +138,10 @@ function M.review(edits, on_complete)
 		vim.cmd('windo diffthis')
 		vim.cmd('windo setlocal foldcolumn=0')
 
-		bind_keys(old_buf, new_buf, index)
+		self.bind_keys(old_buf, new_buf, index)
 	end
 
-	local function bind_keys(old_buf, new_buf, index)
-		local function next_undecided(start)
-			local next = start + 1
-			while next <= #edits and accepted[next] ~= nil do
-				next = next + 1
-			end
-			show_diff(next)
-		end
-
-		local function accept()
-			accepted[index] = true
-			for i = 1, index - 1 do
-				if accepted[i] == nil then
-					show_diff(i)
-					return
-				end
-			end
-			next_undecided(index)
-		end
-
-		local function decline()
-			accepted[index] = false
-			for i = 1, index - 1 do
-				if accepted[i] == nil then
-					show_diff(i)
-					return
-				end
-			end
-			next_undecided(index)
-		end
-
-		local function decline_all()
-			for i = index, #edits do
-				accepted[i] = false
-			end
-			finish()
-		end
-
-		local function set_kmap(buf, key, cb)
-			vim.keymap.set('n', key, cb, { buffer = buf, noremap = true, nowait = true, silent = true })
-		end
-
-		set_kmap(old_buf, '<CR>', accept)
-		set_kmap(new_buf, '<CR>', accept)
-		set_kmap(old_buf, 'q', decline)
-		set_kmap(new_buf, 'q', decline)
-		set_kmap(old_buf, ':q<CR>', decline_all)
-		set_kmap(new_buf, ':q<CR>', decline_all)
-		set_kmap(old_buf, 'l', function() show_diff(index + 1) end)
-		set_kmap(new_buf, 'l', function() show_diff(index + 1) end)
-		set_kmap(old_buf, 'h', function() show_diff(index - 1) end)
-		set_kmap(new_buf, 'h', function() show_diff(index - 1) end)
-	end
-
-	show_diff(1)
+	self.show_diff(1)
 end
 
 return M

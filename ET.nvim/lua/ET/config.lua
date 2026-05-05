@@ -21,14 +21,25 @@ local config = {
 }
 
 function M.get_config()
+	local cfg
 	if vim.fn.filereadable(path) == 1 then
 		local content = vim.fn.readfile(path)
 		local ok, decoded = pcall(vim.fn.json_decode, table.concat(content, ''))
 		if ok then
-			return vim.tbl_deep_extend('force', config, decoded)
+			cfg = vim.tbl_deep_extend('force', config, decoded)
 		end
 	end
-	return config
+	cfg = cfg or vim.deepcopy(config)
+
+	-- api_key: env var fallback if config value is empty
+	if cfg.api_key == '' then
+		local env_key = os.getenv('ET_API_KEY')
+		if env_key then
+			cfg.api_key = env_key
+		end
+	end
+
+	return cfg
 end
 
 local function ensure_dir()

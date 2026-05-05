@@ -201,12 +201,81 @@ function M.create_menu(title, items, on_submit, width, height)
 	return menu
 end
 
+--- Collect focusable components with navigation paths through the box tree.
+--- Each path entry: { dir, index, box_list } where box_list is the parent array.
+local function collect_nav_paths(boxes, dir, parent_path)
+	parent_path = parent_path or {}
+	local result = {}
+	for idx, box in ipairs(boxes) do
+		if type(box) ~= 'table' then goto skip end
+		-- Store a shallow copy of the parent path entries (never deepcopy —
+		-- box_list references must stay live to the original box tree tables)
+		local path = {}
+		for _, e in ipairs(parent_path) do
+			table.insert(path, e)
+		end
+		local entry = { dir = dir, index = idx, box_list = boxes }
+		table.insert(path, entry)
+		if box.dir then
+			local children = collect_nav_paths(box, box.dir, path)
+			for _, child in ipairs(children) do
+				table.insert(result, child)
+			end
+		elseif box.component and box.focusable ~= false then
+			table.insert(result, { component = box.component, path = path })
+		end
+		::skip::
+	end
+	return result
+end
+
+--- Descend into a box to find the first focusable component.
+local function find_first_focusable(box)
+	if type(box) ~= 'table' then return nil end
+	if box.component and box.focusable ~= false then
+		return box.component
+	elseif box.dir then
+		for i = 1, #box do
+			local found = find_first_focusable(box[i])
+			if found then return found end
+		end
+	end
+	return nil
+end
+
+--- Walk box-tree path to find the sibling in a given axis direction.
+--- @param path table[] the component's path through the box tree
+--- @param axis_dir string 'row' (left/right) or 'col' (up/down)
+--- @param direction number +1 for right/down, -1 for left/up
+local function navigate_sibling(path, axis_dir, direction)
+	for level = #path, 1, -1 do
+		local entry = path[level]
+		if entry.dir == axis_dir then
+			-- Walk siblings in the target direction, skipping non-focusable boxes
+			-- (e.g. separator popups between panels)
+			local idx = entry.index + direction
+			while idx >= 1 and idx <= #entry.box_list do
+				local sibling_box = entry.box_list[idx]
+				if sibling_box then
+					local target = find_first_focusable(sibling_box)
+					if target and target.winid and vim.api.nvim_win_is_valid(target.winid) then
+						return target
+					end
+				end
+				idx = idx + direction
+			end
+			return nil -- reached edge
+		end
+	end
+	return nil -- no matching axis ancestor
+end
+
 --- Creates a layout with multiple nui components arranged vertically.
 --- @param width? number|string layout width (default: '90%')
 --- @param height? number|string layout height (default: '85%')
 --- @param boxes {component: any, size?: number, initial_focus?: boolean}[] array of {component, size} where size is percentage
 --- @param direction? string 'col' or 'row'
---- @return nui.layout
+--- @return nui.layout, table[], table[]
 function M.create_layout(width, height, boxes, direction)
 	width = width or '90%'
 	height = height or '85%'
@@ -241,28 +310,47 @@ function M.create_layout(width, height, boxes, direction)
 		relative = 'editor',
 	}, Layout.Box(box_children, { dir = direction }))
 
-	local current_index = 1
-	local function focus_next()
-		current_index = current_index % #components + 1
-		local comp = components[current_index]
-		vim.api.nvim_set_current_win(comp.winid)
+	-- Build navigation graph lazily (winids only available after mount)
+	local nav_entries = collect_nav_paths(boxes, direction)
+	local comp_map = nil
+	local function get_comp_map()
+		if comp_map then return comp_map end
+		comp_map = {}
+		for _, entry in ipairs(nav_entries) do
+			if entry.component.winid then
+				comp_map[entry.component.winid] = entry
+			end
+		end
+		return comp_map
 	end
 
-	local function focus_prev()
-		current_index = current_index > 1 and current_index - 1 or #components
-		local comp = components[current_index]
-		vim.api.nvim_set_current_win(comp.winid)
-	end
-
-	if #components > 1 then
-		for _, comp in ipairs(components) do
-			comp:map('n', '<TAB>', focus_next, { noremap = true, nowait = true })
-			comp:map('n', '<S-TAB>', focus_prev, { noremap = true, nowait = true })
+	-- Directional focus helpers
+	local function focus_direction(axis_dir, direction)
+		local win = vim.api.nvim_get_current_win()
+		local entry = get_comp_map()[win]
+		if not entry then return end
+		local target = navigate_sibling(entry.path, axis_dir, direction)
+		if target then
+			vim.api.nvim_set_current_win(target.winid)
 		end
 	end
 
 	layout:mount()
 	register_component(layout)
+
+	-- C-w h/j/k/l — scoped to layout components only.
+	-- Must be bound AFTER mount: nui.nvim's Layout calls _open() on
+	-- child popups (which creates windows) but does NOT call mount()
+	-- (which would apply stored keymaps). After mount, popup:map()
+	-- writes directly to vim.keymap.set with the correct bufnr.
+	if #components > 1 then
+		for _, comp in ipairs(components) do
+			comp:map('n', '<C-w>h', function() focus_direction('row', -1) end, { noremap = true, nowait = true })
+			comp:map('n', '<C-w>l', function() focus_direction('row', 1) end, { noremap = true, nowait = true })
+			comp:map('n', '<C-w>k', function() focus_direction('col', -1) end, { noremap = true, nowait = true })
+			comp:map('n', '<C-w>j', function() focus_direction('col', 1) end, { noremap = true, nowait = true })
+		end
+	end
 
 	-- Set initial focus: respect initial_focus hint, fall back to first focusable component
 	vim.defer_fn(function()

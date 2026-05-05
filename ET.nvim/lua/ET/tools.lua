@@ -124,6 +124,15 @@ local function sanitize_content(contents)
 		-- Not valid JSON: just strip the wrapping quotes
 		return contents:sub(2, -2)
 	end
+	-- Handle bare escape sequences that the LLM may send unquoted
+	-- (e.g. "test\n" sent as-is vs wrapped in JSON string)
+	if contents:find('\\') then
+		local escaped = contents:gsub('"', '\\"')
+		local ok, decoded = pcall(vim.fn.json_decode, '"' .. escaped .. '"')
+		if ok and type(decoded) == 'string' then
+			return decoded
+		end
+	end
 	return contents
 end
 
@@ -696,7 +705,12 @@ function M.dispatch(name, args)
 	elseif name == 'done' then
 		return { stop = true, message = args.message or 'Task completed' }
 	end
-	return { error = 'Unknown tool: ' .. tostring(name) }
+	local names = {}
+	for _, t in ipairs(M.tool_definitions) do
+		table.insert(names, t['function'].name)
+	end
+	return { error = 'Unknown tool: ' .. tostring(name)
+		.. '. Available tools: ' .. table.concat(names, ', ') }
 end
 
 return M
