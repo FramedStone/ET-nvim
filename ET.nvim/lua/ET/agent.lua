@@ -11,9 +11,9 @@ function M.init()
 		local models = config.get_models()
 		if #models > 0 then
 			cfg.model = models[1]
-			config.set_config(cfg)
+			config.save_config(cfg)
 		else
-			config.set_config()
+			-- User needs to configure endpoint; run :ETEditSettings
 		end
 	end
 end
@@ -65,14 +65,7 @@ function M.open_chat()
 		end
 		if #new_lines > 0 then
 			local existing = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
-			local has_content = false
-			for _, line in ipairs(existing) do
-				if line ~= '' then
-					has_content = true
-					break
-				end
-			end
-			if has_content then
+			if #existing > 0 and existing[1] ~= '' then
 				vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, { '' })
 			end
 			vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, new_lines)

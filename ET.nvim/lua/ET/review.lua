@@ -9,7 +9,6 @@ function M.review(edits, on_complete)
 
 	local saved_buf = vim.api.nvim_get_current_buf()
 	local accepted = {}
-	local show_diff
 
 	local function finish()
 		pcall(vim.cmd, 'diffoff!')
@@ -32,6 +31,58 @@ function M.review(edits, on_complete)
 
 		vim.notify(string.format('ET.nvim: Accepted %d / %d edits', #accepted_list, #edits), vim.log.levels.INFO)
 		if on_complete then on_complete() end
+	end
+
+	local function show_diff(index)
+		if index < 1 then index = 1 end
+		if index > #edits then
+			finish()
+			return
+		end
+
+		pcall(vim.cmd, 'diffoff!')
+		pcall(vim.cmd, 'only')
+
+		local edit = edits[index]
+
+		local old_lines = vim.split(edit.old_content or '', '\n')
+		if #old_lines == 0 then
+			old_lines = { '' }
+		end
+		local new_lines = vim.split(edit.new_content or '', '\n')
+		if #new_lines == 0 then
+			new_lines = { '' }
+		end
+
+		local status = ''
+		if accepted[index] == true then
+			status = ' [accepted]'
+		elseif accepted[index] == false then
+			status = ' [declined]'
+		end
+		local title = string.format('[%d/%d] %s', index, #edits, edit.filepath)
+		if edit.type == 'edit' then
+			title = title .. '#L' .. edit.start_line .. '-L' .. edit.end_line
+		end
+		vim.notify(title .. status, vim.log.levels.INFO)
+
+		local old_buf = vim.api.nvim_create_buf(false, true)
+		vim.api.nvim_buf_set_lines(old_buf, 0, -1, false, old_lines)
+		vim.bo[old_buf].bufhidden = 'wipe'
+
+		local new_buf = vim.api.nvim_create_buf(false, true)
+		vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, new_lines)
+		vim.bo[new_buf].bufhidden = 'wipe'
+
+		vim.api.nvim_set_current_buf(old_buf)
+		vim.cmd('rightbelow vsplit')
+		local new_win = vim.api.nvim_get_current_win()
+		vim.api.nvim_win_set_buf(new_win, new_buf)
+
+		vim.cmd('windo diffthis')
+		vim.cmd('windo setlocal foldcolumn=0')
+
+		bind_keys(old_buf, new_buf, index)
 	end
 
 	local function bind_keys(old_buf, new_buf, index)
@@ -86,58 +137,6 @@ function M.review(edits, on_complete)
 		set_kmap(new_buf, 'l', function() show_diff(index + 1) end)
 		set_kmap(old_buf, 'h', function() show_diff(index - 1) end)
 		set_kmap(new_buf, 'h', function() show_diff(index - 1) end)
-	end
-
-	show_diff = function(index)
-		if index < 1 then index = 1 end
-		if index > #edits then
-			finish()
-			return
-		end
-
-		pcall(vim.cmd, 'diffoff!')
-		pcall(vim.cmd, 'only')
-
-		local edit = edits[index]
-
-		local old_lines = vim.split(edit.old_content or '', '\n')
-		if #old_lines == 0 then
-			old_lines = { '' }
-		end
-		local new_lines = vim.split(edit.new_content or '', '\n')
-		if #new_lines == 0 then
-			new_lines = { '' }
-		end
-
-		local status = ''
-		if accepted[index] == true then
-			status = ' [accepted]'
-		elseif accepted[index] == false then
-			status = ' [declined]'
-		end
-		local title = string.format('[%d/%d] %s', index, #edits, edit.filepath)
-		if edit.type == 'edit' then
-			title = title .. '#L' .. edit.start_line .. '-L' .. edit.end_line
-		end
-		vim.notify(title .. status, vim.log.levels.INFO)
-
-		local old_buf = vim.api.nvim_create_buf(false, true)
-		vim.api.nvim_buf_set_lines(old_buf, 0, -1, false, old_lines)
-		vim.bo[old_buf].bufhidden = 'wipe'
-
-		local new_buf = vim.api.nvim_create_buf(false, true)
-		vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, new_lines)
-		vim.bo[new_buf].bufhidden = 'wipe'
-
-		vim.api.nvim_set_current_buf(old_buf)
-		vim.cmd('rightbelow vsplit')
-		local new_win = vim.api.nvim_get_current_win()
-		vim.api.nvim_win_set_buf(new_win, new_buf)
-
-		vim.cmd('windo diffthis')
-		vim.cmd('windo setlocal foldcolumn=0')
-
-		bind_keys(old_buf, new_buf, index)
 	end
 
 	show_diff(1)
