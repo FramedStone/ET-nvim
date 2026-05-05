@@ -3,18 +3,27 @@ local agent = require('ET.agent')
 
 -- Use for public setup via setup({})
 function M.setup()
-	local bx = vim.fn.executable('bx')
-	local ctx7 = vim.fn.executable('ctx7')
-	if bx == 0 or ctx7 == 0 then
-		vim.notify(string.rep('=', 25) .. 'ET.nvim' .. string.rep('=', 25))
-		if bx == 0 then
-			vim.notify('- bx not installed (bravesearch cli)')
+	local missing = {}
+	if vim.fn.executable('bx') == 0 then
+		table.insert(missing, 'bx (bravesearch cli)')
+	end
+	if vim.fn.executable('ctx7') == 0 then
+		table.insert(missing, 'ctx7 (context7 cli)')
+	end
+	if vim.fn.executable('jq') == 0 then
+		table.insert(missing, 'jq (json processor)')
+	end
+	if vim.fn.executable('lynx') == 0 then
+		table.insert(missing, 'lynx (html-to-text for web_fetch)')
+	end
+
+	if #missing > 0 then
+		vim.notify(string.rep('=', 20) .. ' ET.nvim ' .. string.rep('=', 20))
+		for _, tool in ipairs(missing) do
+			vim.notify('  missing: ' .. tool)
 		end
-		if ctx7 == 0 then
-			vim.notify('- ctx7 not installed (context7 cli)')
-		end
-		vim.notify('\n\nRun :ETInstallTools to install all external tools')
-		vim.notify(string.rep('=', 57))
+		vim.notify('\nRun :ETInstallTools to install all external tools')
+		vim.notify(string.rep('=', 51))
 	end
 
 	agent.init()
