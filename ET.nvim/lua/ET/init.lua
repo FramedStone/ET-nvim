@@ -1,8 +1,25 @@
 local M = {}
+local config = require('ET.config')
 local agent = require('ET.agent')
 
--- Use for public setup via setup({})
-function M.setup()
+-- Public setup. Accepts an opts table that deep-merges into config.json.
+--
+-- Usage via lazy.nvim:
+--   opts = { endpoint = 'http://localhost:8000/v1', model = 'llama3' }
+--
+-- Or explicit config function:
+--   config = function()
+--     require('ET').setup({ api_key = 'sk-...' })
+--   end
+function M.setup(opts)
+	-- Merge user opts into config (saves to disk so :ETEditSettings stays in sync)
+	if opts and type(opts) == 'table' then
+		local cfg = config.get_config()
+		cfg = vim.tbl_deep_extend('force', cfg, opts)
+		config.save_config(cfg)
+	end
+
+	-- Check external tool dependencies
 	local missing = {}
 	if vim.fn.executable('bx') == 0 then
 		table.insert(missing, 'bx (bravesearch cli)')

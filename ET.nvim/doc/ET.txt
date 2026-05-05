@@ -1,0 +1,470 @@
+*ET.txt*         ET.nvim — Human-First Neovim AI Agent
+
+==============================================================================
+CONTENTS                                      *ET-contents*
+
+  1. Introduction ...................... |ET-intro|
+  2. Requirements ...................... |ET-requirements|
+  3. Installation ...................... |ET-install|
+  4. Configuration ..................... |ET-config|
+  5. Commands .......................... |ET-commands|
+  6. Agent Workflow .................... |ET-workflow|
+  7. Tools ............................. |ET-tools|
+  8. Brave Search ...................... |ET-bravesearch|
+  9. Context7 .......................... |ET-context7|
+ 10. Web Fetch ......................... |ET-webfetch|
+ 11. System Prompt ..................... |ET-system-prompt|
+ 12. Edit Review ....................... |ET-review|
+ 13. Keybindings ....................... |ET-keybindings|
+
+==============================================================================
+1. INTRODUCTION                                *ET-intro*
+
+ET.nvim is an AI coding agent for Neovim. It combines a stateless tool-calling
+loop with |nui.nvim|-powered UI. The agent finds files, reads code, makes
+content-based edits, searches the web via Brave Search, fetches documentation
+via Context7, and scrapes web pages via lynx.
+
+Every edit is staged and reviewed through |vimdiff| before it touches disk.
+You stay in full control.
+
+==============================================================================
+2. REQUIREMENTS                                *ET-requirements*
+
+                                              *ET-deps-neovim*
+Neovim >= 0.9
+
+                                              *ET-deps-plugins*
+  - |nui.nvim|     UI components (popup, menu, input, layout, tree)
+  - |fzf-lua|      File picker (`:ETFilePicker`)
+
+                                              *ET-deps-external*
+  - bx    Brave Search CLI
+  - ctx7  Context7 CLI
+  - lynx  HTML-to-text converter for web_fetch (optional on Windows)
+  - jq    JSON processor (Brave Search result filtering)
+  - fixjson  JSON formatter (config file)
+
+Install all missing external tools with: >
+  :ETInstallTools
+<
+
+On startup, ET.nvim checks that `bx`, `ctx7`, `jq`, and `lynx` are on PATH.
+Missing tools are reported in a notification.
+
+==============================================================================
+3. INSTALLATION                                *ET-install*
+
+                                              *ET-install-lazy*
+lazy.nvim (recommended): >
+
+  {
+    'user/ET.nvim',
+    dependencies = {
+      'MunifTanjim/nui.nvim',
+      'ibhagwan/fzf-lua',
+    },
+    opts = {
+      endpoint = 'http://localhost:8000/v1',
+      -- model = 'llama3',
+    },
+  }
+<
+
+With custom keymaps: >
+  {
+    'user/ET.nvim',
+    dependencies = { 'MunifTanjim/nui.nvim', 'ibhagwan/fzf-lua' },
+    keys = {
+      { '<leader>ea', ':ET<CR>',             desc = 'ET Chat' },
+      { '<leader>eb', ':ETBraveSearch<CR>',  desc = 'ET Brave Search' },
+      { '<leader>ec', ':ETContext7<CR>',     desc = 'ET Context7' },
+    },
+    opts = { endpoint = 'http://localhost:8000/v1' },
+  }
+<
+
+                                              *ET-install-config-fn*
+Explicit config function: >
+
+  require('ET').setup({
+    endpoint = 'http://localhost:8000/v1',
+    api_key  = 'sk-...',
+  })
+<
+
+All options passed via `opts` or `setup({...})` are deep-merged into the
+config file and saved to disk. They can be changed later with `:ETEditSettings`.
+
+==============================================================================
+4. CONFIGURATION                               *ET-config*
+
+Configuration is stored at |stdpath()| + '/.et/config.json'.
+
+                                              *ET-config-defaults*
+Default values: >
+
+  endpoint      = 'http://localhost:8000/v1'
+  api_key       = ''   (falls back to $ET_API_KEY)
+  model         = nil   (auto-picks first available)
+  system_prompt = 'You are an agent that acts only through tools. ...'
+  sampling_params = {
+    temperature         = nil,
+    max_tokens          = nil,
+    top_p               = nil,
+    top_k               = nil,
+    repetition_penalty  = nil,
+    presence_penalty    = nil,
+    chat_template_kwargs = {
+      enable_thinking  = true,
+      reasoning_effort = nil,
+    },
+  }
+<
+
+                                              *ET-config-sampling*
+Any `sampling_params` field set to `nil` is omitted from the API request
+(falls back to the server's defaults). Pass values directly to control
+generation: >
+
+  opts = {
+    sampling_params = {
+      temperature = 0.7,
+      max_tokens  = 4096,
+    },
+  }
+<
+
+Commands for configuration:
+  `:ETEditSettings`    Edit config.json in a popup. `:w<CR>` to save.
+  `:ETSwitchModel`     Pick from available models on the endpoint.
+  `:ETSystemPrompt`    View and edit the full system prompt.
+
+                                              *ET-config-api-key*
+The `api_key` field can be omitted from the config file entirely.
+ET.nvim checks these sources in order:
+  1. `config.json` → `api_key` field
+  2. `$ET_API_KEY` environment variable
+If neither is set, requests are sent without an Authorization header.
+
+When using oMLX, the `--api-key` flag on `omlx serve` sets the
+server-side key. See https://github.com/jundot/omlx#cli-configuration .
+The value must match between server and client.
+
+The model is auto-set to the first available model on first run if none
+is configured.
+
+==============================================================================
+5. COMMANDS                                    *ET-commands*
+
+                                                 *:ET*
+:ET [range]          Open the chat popup. If a visual range is selected,
+                     the selected lines are pre-filled with the absolute
+                     file path and line anchor (e.g. `#L10-L25`).
+                     Type your prompt, then `:w<CR>` to send.
+
+                                                 *:ETSwitchModel*
+:ETSwitchModel       Open a menu to select from available models fetched
+                     from the configured endpoint.
+
+                                                 *:ETEditSettings*
+:ETEditSettings      Open config.json in an editable popup.
+                     `:w<CR>` to save and close, `q` to discard changes.
+
+                                                 *:ETFilePicker*
+:ETFilePicker        Open fzf-lua file picker. Selected file paths are
+                     inserted into the current buffer.
+
+                                                 *:ETBraveSearch*
+:ETBraveSearch       Open the Brave Search UI. See |ET-bravesearch|.
+
+                                                 *:ETContext7*
+:ETContext7          Open the Context7 dual-panel UI. See |ET-context7|.
+
+                                                 *:ETContext7AddToDocs*
+:ETContext7AddToDocs Copy the selected library result from the Context7
+                     library pane into the docs library input field, then
+                     focus the docs query input. Requires ETContext7 to
+                     be open.
+
+                                                 *:ETWebFetchResults*
+:ETWebFetchResults   Show cached web_fetch results from the last agent
+                     run. Navigate pages with `l` / `h`. See |ET-webfetch|.
+
+                                                 *:ETAddToSystemPrompt*
+:ETAddToSystemPrompt [range]
+                     Add selected text (visual range) or the currently
+                     focused tree result to the persistent system prompt.
+                     Opens a review popup where you can edit the text
+                     before saving. `:w<CR>` to confirm.
+
+                                                 *:ETAddToPrompt*
+:ETAddToPrompt [range]
+                     Add selected text or focused tree result to the next
+                     agent prompt (one-shot, cleared after the agent run).
+                     Opens a review popup before adding.
+
+                                                 *:ETSystemPrompt*
+:ETSystemPrompt      View and edit the full system prompt (base + per-project
+                     additions). `:w<CR>` to save and close.
+
+                                                 *:ETInstallTools*
+:ETInstallTools      Install missing external tools. Checks each tool
+                     (bx, ctx7, jq, lynx) and only installs what's missing.
+                     Opens a terminal buffer so you can monitor progress.
+                     If all tools are already installed, shows a notification
+                     and does nothing.
+
+==============================================================================
+6. AGENT WORKFLOW                              *ET-workflow*
+
+ET.nvim uses a stateless tool-calling loop. Each `:ET` invocation starts
+with a fresh conversation — there is no persistent chat history.
+
+  1. `:ET` opens the chat popup
+  2. Type a prompt, optionally add context with `:ETAddToPrompt`
+  3. Press `:w<CR>` to send
+  4. The LLM receives the system prompt + user message and responds with
+     tool calls (not conversational text)
+  5. Each tool is dispatched and its result is fed back into the
+     conversation
+  6. The loop repeats until the LLM calls the `done` tool
+  7. If any edits were staged, a vimdiff review opens (see |ET-review|)
+  8. Accepted edits are written to disk
+  9. Web fetch results are shown if any pages were fetched
+
+The system prompt instructs the model to respond ONLY with tool calls.
+This keeps the agent focused and prevents conversational responses that
+waste tokens.
+
+==============================================================================
+7. TOOLS                                       *ET-tools*
+
+The agent has access to these tools. Function signatures shown as the
+LLM sees them (JSON Schema).
+
+                                              *ET-tool-find_files*
+find_files(filenames: string[]) ~
+  Find files by name or glob pattern using the system `find` command.
+  Returns an array of absolute paths.
+
+                                              *ET-tool-read_file*
+read_file(filepath: string) ~
+  Read a file's contents. Returns virtualized content that includes
+  any pending unstaged edits — the agent sees the file as it will
+  look after all prior edits in this run are applied.
+
+                                              *ET-tool-edit_file*
+edit_file(filepath, oldText, newText) ~
+  Content-based exact-text-match edit. `oldText` is located in the
+  (virtualized) file and replaced with `newText`. No line numbers
+  are needed — the agent copy-pastes exact text from `read_file`
+  output. Edits are STAGED, not applied. They are reviewed via
+  vimdiff after the agent calls `done`.
+
+  The edit will fail with a helpful error if:
+    - `oldText` cannot be found in the file
+    - The region overlaps with a prior pending edit
+    - Prior edits have shifted line numbers (tells the agent to
+      call `read_file` again)
+
+                                              *ET-tool-web_fetch*
+web_fetch(url, query?) ~
+  Fetch and cache a web page. Primary HTML-to-text conversion uses
+  `lynx -dump`; falls back to Lua-based stripping if lynx is absent.
+  Pages are cached for the session (across agent calls).
+
+  Without `query`: returns a preview of the first 200 lines.
+  With `query`: greps cached content case-insensitively and returns
+  matching lines with ±2 lines of context (up to 25 matches).
+
+  Content is truncated to 20,000 lines per page.
+
+                                              *ET-tool-done*
+done(message) ~
+  Signal task completion. The message is shown as a vim.notify.
+  Triggers the edit review flow if any edits were staged.
+  This is the ONLY way the agent terminates the loop.
+
+==============================================================================
+8. BRAVE SEARCH                                *ET-bravesearch*
+
+`:ETBraveSearch` opens a two-row layout:
+
+  Top (80%):     Result tree
+  Bottom (60%):  Query input (initial focus)
+  Bottom (40%):  Type selector — web, news, images, videos
+
+Workflow:
+  1. Select a search type in the right menu (default: web)
+  2. Type a query in the input field
+  3. Press `:w<CR>` to search
+  4. Enter a result count (default: 5)
+  5. Browse results in the tree
+  6. Press `l` or Enter on a result to open its URL in the browser
+
+Results can be added to the agent's context:
+  - Focus the result tree
+  - Run `:ETAddToSystemPrompt` (persistent) or `:ETAddToPrompt` (one-shot)
+  - The result is inserted as JSON: `{source, type, result}`
+
+                                              *ET-bravesearch-types*
+Search types and their output fields: >
+  web    {title, url, description}
+  news   {title, url, age, description}
+  images {title, url, source, thumbnail}
+  videos {title, url, duration, thumbnail}
+<
+
+Requires the `bx` CLI and a Brave Search API key. Run `bx config set-key`
+once, or set the `BRAVE_SEARCH_API_KEY` environment variable.
+
+==============================================================================
+9. CONTEXT7                                    *ET-context7*
+
+`:ETContext7` opens a three-column layout:
+
+  Left (49%):     Library search results (tree)
+  Center (2%):    Arrow separator (→)
+  Right (49%):    Docs search results (tree)
+
+  Left bottom:    Library query input (initial focus)
+  Right bottom:   Library ID input | Docs query input
+
+Workflow:
+  1. Type a library name in the left query input, press `:w<CR>`
+  2. Browse matching libraries in the tree
+  3. Select a library, run `:ETContext7AddToDocs`
+     ─ this copies the library ID to the right panel
+  4. Type a docs query in the right query input, press `:w<CR>`
+  5. Browse documentation snippets in the right tree
+  6. Press `l` or Enter on a snippet to open it in the browser
+
+Results can be added to the agent's context via `:ETAddToSystemPrompt`
+or `:ETAddToPrompt` from either tree.
+
+                                              *ET-context7-library*
+Library search results show: library ID, title, last update date, star
+count, and branch. Results with stars = -1 are filtered out.
+
+                                              *ET-context7-docs*
+Docs results show: code title, language, and code ID. Press Enter to
+open the source URL.
+
+                                              *ET-context7-notes*
+Notes:
+  - `ctx7 library` does not support a count parameter. ET.nvim prunes
+    results client-side after prompting for a count.
+  - `--research` mode is not used (requires a Context7 API key).
+    Regular mode works without authentication.
+
+ctx7 works without an API key for standard library and docs lookups.
+
+==============================================================================
+10. WEB FETCH                                  *ET-webfetch*
+
+After each agent run, `:ETWebFetchResults` shows cached web pages in a
+paginated popup. It opens automatically if web_fetch was used during
+the run.
+
+Navigation:
+  `l`       Next page
+  `h`       Previous page
+  `a`       Add current page metadata to prompt context (one-shot)
+  `A`       Add current page metadata to system prompt (persistent)
+  `:w<CR>`  Add to prompt context (same as `a` in this popup)
+  `q`       Close
+
+Each page shows: URL, title, line count, and first 500 lines (with a
+note if truncated).
+
+The agent's `web_fetch` tool caches up to 20,000 lines per URL. Pages
+are cached across agent calls within the same session.
+
+==============================================================================
+11. SYSTEM PROMPT                               *ET-system-prompt*
+
+The system prompt has two parts: >
+
+  1. Base prompt (config.json → system_prompt field)
+  2. Per-project additions (.et/states/<hash>.json)
+<
+
+                                              *ET-system-prompt-base*
+The base prompt defaults to: >
+
+  You are an agent that acts only through tools. You must respond
+  only with a JSON tool call, with no text before or after.
+<
+
+Override it via `opts.system_prompt` in lazy.nvim, `setup({...})`, or
+`:ETSystemPrompt`.
+
+                                              *ET-system-prompt-project*
+Per-project additions persist across Neovim sessions and are keyed by
+a hash of the current working directory. Use `:ETAddToSystemPrompt` to
+append text from a visual selection or focused tree result.
+
+                                              *ET-system-prompt-oneshot*
+`:ETAddToPrompt` is one-shot — the text is prepended to the next agent
+prompt only, and cleared when the agent completes.
+
+==============================================================================
+12. EDIT REVIEW                                 *ET-review*
+
+After the agent calls `done` with staged edits, a vimdiff review opens
+for each edit:
+
+  Left window:   Original text
+  Right window:  Proposed replacement
+
+The diff title shows `[N/M] filepath#Lstart-Lend` with an acceptance
+status suffix.
+
+Keybindings:
+  <CR>           Accept this edit
+  q              Decline this edit
+  :q<CR>         Decline this edit AND all remaining
+  l              Skip to next edit (leave undecided)
+  h              Go back to the previous undecided edit
+
+After reviewing all edits, a notification shows:
+  `ET.nvim: Accepted X / Y edits`
+
+Accepted edits are written to disk immediately. Declined edits are
+discarded. Skipped edits remain undecided (treated as declined).
+
+==============================================================================
+13. KEYBINDINGS                                 *ET-keybindings*
+
+                                              *ET-keybindings-popups*
+Standard in all ET.nvim popups: >
+
+  :w<CR>        Submit / save / run search
+  :wq<CR>       Submit and close
+  q, :q<CR>     Close without saving
+  <C-w>h       Focus component to the left (layouts)
+  <C-w>j       Focus component below (layouts)
+  <C-w>k       Focus component above (layouts)
+  <C-w>l       Focus component to the right (layouts)
+<
+                                              *ET-keybindings-trees*
+Tree components (search results): >
+
+  l, <CR>       Expand node / open URL (on leaf nodes)
+  h             Collapse node
+  j             Next item
+  k             Previous item
+<
+                                              *ET-keybindings-review*
+Edit review (vimdiff): >
+
+  <CR>           Accept edit
+  q              Decline edit
+  :q<CR>         Decline all remaining
+  l              Next edit
+  h              Previous undecided edit
+<
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

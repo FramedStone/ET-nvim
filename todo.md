@@ -41,6 +41,7 @@
     - vimdiff
 - [x] refactor codebase: decouple modules and simplify
 - [ ] doc and readme update
+    - LICENSE set as highest privacy
 - [ ] quickfix integration
 - [ ] diagnosis integration
 - [ ] nvim extended tools (e.g. func definition, symbols, func implementation)
