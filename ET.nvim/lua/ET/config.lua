@@ -71,15 +71,10 @@ function M.set_config(cfg)
 		end
 	end
 
-	local function close_popup()
-		p:unmount()
-	end
-
-	p:map('n', ':wq<CR>', function()
+	ui.bind_save_close_keys(p, function()
 		save_and_close()
 		p:unmount()
-	end, { noremap = true })
-	p:map('n', 'q', close_popup, { noremap = true })
+	end)
 end
 
 function M.get_models()

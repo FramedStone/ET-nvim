@@ -5,7 +5,6 @@ local tools = require('ET.tools')
 local states = require('ET.states')
 local Popup = require('nui.popup')
 local Menu = require('nui.menu')
-local Input = require('nui.input')
 local Tree = require('nui.tree')
 
 vim.api.nvim_create_user_command('ETSwitchModel', function()
@@ -46,12 +45,7 @@ vim.api.nvim_create_user_command('ET', function(opts)
 		local out = tools.select_line_of_codes(opts, source_buf)
 		if out and popup and popup.bufnr then
 			vim.api.nvim_buf_set_lines(popup.bufnr, -1, -1, false, vim.split(out, '\n'))
-			vim.schedule(function()
-				if popup.winid then
-					local last = vim.api.nvim_buf_line_count(popup.bufnr)
-					vim.api.nvim_win_set_cursor(popup.winid, { last, 0 })
-				end
-			end)
+			ui.focus_last_line(popup)
 		end
 	end
 end, { range = true, desc = 'Open ET Chat' })
@@ -128,21 +122,18 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 				local title = res.title or 'No title'
 				local url = res.url or ''
 
-				-- For images/videos, override url with thumbnail src
 				local result_copy = vim.tbl_deep_extend('force', {}, res)
-				if selected_type == 'images' and result_copy.thumbnail then
-					result_copy.url = result_copy.thumbnail
-				elseif selected_type == 'videos' and result_copy.thumbnail then
+				if selected_type == 'videos' and result_copy.thumbnail then
 					result_copy.url = result_copy.thumbnail
 				end
 
-				-- Create child node for URL
+				-- Build children: URL + type-specific fields
 				local children = {}
-				if url ~= '' then
-					table.insert(
-						children,
-						Tree.Node({ id = 'url-' .. i, text = '  ' .. url, _is_child = true, _url = url })
-					)
+				if selected_type == 'images' then
+					local thumb = res.thumbnail or url
+					table.insert(children, Tree.Node({ id = 'url-' .. i, text = '  ' .. thumb, _is_child = true, _url = thumb }))
+				elseif url ~= '' then
+					table.insert(children, Tree.Node({ id = 'url-' .. i, text = '  ' .. url, _is_child = true, _url = url }))
 				end
 
 				-- Parent node stores the full result data
@@ -182,38 +173,7 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 		end
 
 		-- Prompt for count with temporary input
-		local count_input = Input({
-			relative = 'cursor',
-			position = { row = 1, col = 0 },
-			size = 25,
-			zindex = 200,
-			border = {
-				style = 'rounded',
-				text = { top = '[Result Count]', top_align = 'left' },
-			},
-			win_options = {
-				winhighlight = 'Normal:Normal,FloatBorder:Normal',
-			},
-		}, {
-			prompt = 'count: ',
-			default_value = '5',
-			on_submit = function(value)
-				local count = tonumber(value) or 5
-				if count < 1 then
-					count = 5
-				end
-				run_search(query, count)
-			end,
-			on_close = function()
-				-- User cancelled, do nothing
-			end,
-		})
-
-		count_input:map('n', '<Esc>', function()
-			count_input:unmount()
-		end, { noremap = true, nowait = true })
-
-		count_input:mount()
+		ui.prompt_count(function(count) run_search(query, count) end)
 	end
 
 	-- Initialize tree after popup is mounted
@@ -223,28 +183,17 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 		end
 
 		result_tree = ui.create_tree(bravesearch_result_popup, 'Enter query and press :w<CR> to search', {
+			on_open = function(node)
+				if node._res and node._res.url then
+					vim.ui.open(node._res.url)
+					return true
+				end
+				if node._url then
+					vim.ui.open(node._url)
+					return true
+				end
+			end,
 			keymaps = {
-				['<CR>'] = function()
-					if not result_tree then
-						return
-					end
-					local node = result_tree:get_node()
-					if not node then
-						return
-					end
-					if node._res and node._res.url then
-						vim.ui.open(node._res.url)
-					elseif node._url then
-						vim.ui.open(node._url)
-					elseif node:has_children() then
-						if node:is_expanded() then
-							node:collapse()
-						else
-							node:expand()
-						end
-						result_tree:render()
-					end
-				end,
 				['<Esc>'] = function() end,
 			},
 		})
@@ -424,38 +373,7 @@ vim.api.nvim_create_user_command('ETContext7', function()
 			return
 		end
 
-		local count_input = Input({
-			relative = 'cursor',
-			position = { row = 1, col = 0 },
-			size = 25,
-			zindex = 200,
-			border = {
-				style = 'rounded',
-				text = { top = '[Result Count]', top_align = 'left' },
-			},
-			win_options = {
-				winhighlight = 'Normal:Normal,FloatBorder:Normal',
-			},
-		}, {
-			prompt = 'count: ',
-			default_value = '5',
-			on_submit = function(value)
-				local count = tonumber(value) or 5
-				if count < 1 then
-					count = 5
-				end
-				run_library_search(query, count)
-			end,
-			on_close = function()
-				-- User cancelled, do nothing
-			end,
-		})
-
-		count_input:map('n', '<Esc>', function()
-			count_input:unmount()
-		end, { noremap = true, nowait = true })
-
-		count_input:mount()
+		ui.prompt_count(function(count) run_library_search(query, count) end)
 	end
 
 	-- Docs search functions
@@ -535,38 +453,7 @@ vim.api.nvim_create_user_command('ETContext7', function()
 			return
 		end
 
-		local count_input = Input({
-			relative = 'cursor',
-			position = { row = 1, col = 0 },
-			size = 25,
-			zindex = 200,
-			border = {
-				style = 'rounded',
-				text = { top = '[Result Count]', top_align = 'left' },
-			},
-			win_options = {
-				winhighlight = 'Normal:Normal,FloatBorder:Normal',
-			},
-		}, {
-			prompt = 'count: ',
-			default_value = '5',
-			on_submit = function(value)
-				local count = tonumber(value) or 5
-				if count < 1 then
-					count = 5
-				end
-				run_docs_search(lib_id, raw_query, count)
-			end,
-			on_close = function()
-				-- User cancelled, do nothing
-			end,
-		})
-
-		count_input:map('n', '<Esc>', function()
-			count_input:unmount()
-		end, { noremap = true, nowait = true })
-
-		count_input:mount()
+		ui.prompt_count(function(count) run_docs_search(lib_id, raw_query, count) end)
 	end
 
 	-- Set arrow content after mount
@@ -590,8 +477,26 @@ vim.api.nvim_create_user_command('ETContext7', function()
 			return
 		end
 
-		library_result_tree = ui.create_tree(context7_library_result, 'Search for a library to get started')
-		docs_result_tree = ui.create_tree(context7_docs_result, 'Search for docs to get started')
+		library_result_tree = ui.create_tree(context7_library_result, 'Search for a library to get started', {
+			on_open = function(node)
+				if node._lib_id then
+					vim.ui.open('https://github.com' .. node._lib_id)
+					return true
+				end
+				if node._url then
+					vim.ui.open(node._url)
+					return true
+				end
+			end,
+		})
+		docs_result_tree = ui.create_tree(context7_docs_result, 'Search for docs to get started', {
+			on_open = function(node)
+				if node._url then
+					vim.ui.open(node._url)
+					return true
+				end
+			end,
+		})
 
 		-- Store references for ETContext7AddToDocs
 		states.ui.library_result_tree = library_result_tree
@@ -603,54 +508,10 @@ vim.api.nvim_create_user_command('ETContext7', function()
 		context7_library_input:map('n', ':w<CR>', execute_library_search, { noremap = true, nowait = true })
 		context7_library_result:map('n', ':w<CR>', execute_library_search, { noremap = true, nowait = true })
 
-		-- Map <CR> to open library GitHub page
-		context7_library_result:map('n', '<CR>', function()
-			if not library_result_tree then
-				return
-			end
-			local node = library_result_tree:get_node()
-			if not node then
-				return
-			end
-			if node._lib_id then
-				vim.ui.open('https://github.com' .. node._lib_id)
-			elseif node._url then
-				vim.ui.open(node._url)
-			elseif node:has_children() then
-				if node:is_expanded() then
-					node:collapse()
-				else
-					node:expand()
-				end
-				library_result_tree:render()
-			end
-		end, { noremap = true, nowait = true })
-
 		-- Map :w<CR> on right-side components for docs search
 		context7_docs_library_input:map('n', ':w<CR>', execute_docs_search, { noremap = true, nowait = true })
 		context7_docs_input:map('n', ':w<CR>', execute_docs_search, { noremap = true, nowait = true })
 		context7_docs_result:map('n', ':w<CR>', execute_docs_search, { noremap = true, nowait = true })
-
-		-- Map <CR> on docs result to open codeId URL
-		context7_docs_result:map('n', '<CR>', function()
-			if not docs_result_tree then
-				return
-			end
-			local node = docs_result_tree:get_node()
-			if not node then
-				return
-			end
-			if node._url then
-				vim.ui.open(node._url)
-			elseif node:has_children() then
-				if node:is_expanded() then
-					node:collapse()
-				else
-					node:expand()
-				end
-				docs_result_tree:render()
-			end
-		end, { noremap = true, nowait = true })
 	end, 100)
 end, { desc = 'Context7' })
 
@@ -732,7 +593,7 @@ local function open_review_popup(text, mode)
 
 	local function save_and_close()
 		local lines = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
-		local content = table.concat(lines, '\n'):gsub('^%s*(.-)%s*$', '%1')
+		local content = ui.trim(table.concat(lines, '\n'))
 		if content ~= '' then
 			if mode == 'system' then
 				states.add_to_system_prompt(content)
@@ -751,11 +612,7 @@ local function open_review_popup(text, mode)
 		end
 	end
 
-	popup:map('n', ':w<CR>', save_and_close, { noremap = true, nowait = true })
-	popup:map('n', ':wq<CR>', save_and_close, { noremap = true, nowait = true })
-	popup:map('n', 'q', function()
-		popup:unmount()
-	end, { noremap = true, nowait = true })
+	ui.bind_save_close_keys(popup, save_and_close)
 end
 
 -- Helper: detect focused tree window and return selected node's data
@@ -905,8 +762,7 @@ vim.api.nvim_create_user_command('ETSystemPrompt', function()
 
 	popup:mount()
 	vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
-	local last_line = vim.api.nvim_buf_line_count(popup.bufnr)
-	vim.api.nvim_win_set_cursor(popup.winid, { last_line, 0 })
+	ui.focus_last_line(popup)
 
 	local function save_and_close()
 		local new_lines = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
@@ -920,11 +776,7 @@ vim.api.nvim_create_user_command('ETSystemPrompt', function()
 		vim.notify('ET.nvim: System prompt updated')
 	end
 
-	popup:map('n', ':w<CR>', save_and_close, { noremap = true, nowait = true })
-	popup:map('n', ':wq<CR>', save_and_close, { noremap = true, nowait = true })
-	popup:map('n', 'q', function()
-		popup:unmount()
-	end, { noremap = true, nowait = true })
+	ui.bind_save_close_keys(popup, save_and_close)
 end, { desc = 'Edit system prompt' })
 
 vim.api.nvim_create_user_command('ETInstallTools', function()
