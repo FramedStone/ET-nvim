@@ -488,36 +488,28 @@ function M.create_tree(popup, placeholder, opts)
 		prepare_node = prepare_node,
 	})
 
-	-- Shared handler for <CR> and l: try on_open first, fall back to toggle
+	-- <CR>: try on_open first (open URLs), fall back to toggle
 	local function activate_node()
 		local node = tree:get_node()
 		if not node then return end
-		-- on_open gets first chance; return true means "handled, don't toggle"
 		if opts.on_open and opts.on_open(node) then
 			return
 		end
 		toggle_tree_node(tree, node)
 	end
 
+	-- t: toggle expand/collapse (never open URLs)
+	local function toggle_node()
+		local node = tree:get_node()
+		if node then
+			toggle_tree_node(tree, node)
+		end
+	end
+
 	local keymaps = opts.keymaps or {}
 
-	if keymaps.h ~= false then
-		local handler = keymaps.h or activate_node
-		popup:map('n', 'h', handler, { noremap = true, nowait = true })
-	end
-
-	if keymaps.l ~= false then
-		popup:map('n', 'l', keymaps.l or activate_node, { noremap = true, nowait = true })
-	end
-
-	if keymaps.j ~= false then
-		local handler = keymaps.j or 'j'
-		popup:map('n', 'j', handler, { noremap = true, nowait = true })
-	end
-
-	if keymaps.k ~= false then
-		local handler = keymaps.k or 'k'
-		popup:map('n', 'k', handler, { noremap = true, nowait = true })
+	if keymaps.t ~= false then
+		popup:map('n', 't', keymaps.t or toggle_node, { noremap = true, nowait = true })
 	end
 
 	if keymaps['<CR>'] ~= false then
