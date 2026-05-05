@@ -10,7 +10,8 @@ function M.select_files(callback)
 				local paths = {}
 				for _, s in ipairs(selected) do
 					local file = fzf.path.entry_to_file(s)
-					table.insert(paths, file.path)
+					local abs = vim.fn.fnamemodify(file.path, ':p')
+					table.insert(paths, abs)
 				end
 				callback(paths)
 			end,
