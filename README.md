@@ -231,6 +231,6 @@ flowchart TD
 
 ## License
 
-MIT — see [LICENSE](./LICENSE)
+AGPL-3.0 — see [LICENSE](./LICENSE)
 
 For full documentation, see `:help ET` inside Neovim.
