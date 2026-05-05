@@ -59,7 +59,7 @@ Run `:ETInstallTools` to install all external tools in one command.
 
 ```lua
 {
-  'user/ET.nvim',
+  'FramedStone/ET.nvim',
   dependencies = {
     'MunifTanjim/nui.nvim',
     'ibhagwan/fzf-lua',
@@ -77,7 +77,7 @@ With custom keymaps:
 
 ```lua
 {
-  'user/ET.nvim',
+  'FramedStone/ET.nvim',
   dependencies = {
     'MunifTanjim/nui.nvim',
     'ibhagwan/fzf-lua',
@@ -96,7 +96,7 @@ Or explicit `config` function:
 
 ```lua
 {
-  'user/ET.nvim',
+  'FramedStone/ET.nvim',
   dependencies = { 'MunifTanjim/nui.nvim', 'ibhagwan/fzf-lua' },
   config = function()
     require('ET').setup({
