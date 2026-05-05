@@ -18,6 +18,24 @@ Designed for [oMLX](https://github.com/jundot/omlx) and any OpenAI-compatible en
 
 ---
 
+## Why Human-First
+
+LLMs ship with frozen training data. When a library releases a breaking
+change, the model has no way to know — it will confidently generate
+outdated code. ET.nvim puts **you** in control of the agent's knowledge:
+
+1. **Search** — `:ETBraveSearch` or `:ETContext7` finds the latest docs,
+   changelogs, and code examples
+2. **Curate** — browse results, pick what's relevant
+3. **Inject** — `:ETAddToSystemPrompt` feeds curated knowledge into the
+   agent's system prompt (per-project, persists across restarts)
+4. **Act** — the agent now codes against current reality, not stale
+   training data
+
+The human researches, the agent executes — each doing what they're best at.
+
+---
+
 ## Requirements
 
 | Type | Dependency | Purpose |

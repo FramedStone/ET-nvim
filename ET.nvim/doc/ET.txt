@@ -381,6 +381,17 @@ are cached across agent calls within the same session.
 ==============================================================================
 11. SYSTEM PROMPT                               *ET-system-prompt*
 
+                                              *ET-system-prompt-human-first*
+ET.nvim is Human-First: LLMs have frozen training data and cannot know
+about library updates, new APIs, or breaking changes released after
+their cutoff date. ET.nvim solves this by letting you research and
+inject current knowledge BEFORE the agent runs:
+>
+  1. :ETBraveSearch / :ETContext7  → search for latest docs
+  2. Browse result trees, pick what's relevant
+  3. :ETAddToSystemPrompt           → inject into agent's system prompt
+  4. :ET                             → agent codes with current knowledge
+<
 The system prompt has two parts: >
 
   1. Base prompt (config.json → system_prompt field)
