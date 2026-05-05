@@ -264,34 +264,27 @@ function M.create_layout(width, height, boxes, direction)
 	layout:mount()
 	register_component(layout)
 
-	local function find_initial_focus(box_list)
-		for _, box in ipairs(box_list) do
-			if box.initial_focus and box.component and box.component.winid then
-				return box
-			end
-			if box.dir and box[1] then
-				local nested = find_initial_focus(box)
-				if nested then
-					return nested
+	-- Set initial focus: respect initial_focus hint, fall back to first focusable component
+	vim.defer_fn(function()
+		local target = nil
+		-- Walk box configs recursively to find the one marked initial_focus
+		local function find_initial(box_list)
+			for _, box in ipairs(box_list) do
+				if box.initial_focus and box.component and box.component.winid then
+					target = box.component
+					return true
+				end
+				if box.dir and box[1] then
+					if find_initial(box) then return true end
 				end
 			end
 		end
-		return nil
-	end
-
-	local function set_initial_focus()
-		local target_box = find_initial_focus(boxes)
-		if not target_box and boxes[1] and boxes[1].dir then
-			target_box = boxes[1][2] or boxes[1][1]
+		find_initial(boxes)
+		target = target or components[1]
+		if target and target.winid then
+			vim.api.nvim_set_current_win(target.winid)
 		end
-		if not target_box and boxes[1] and boxes[1].component then
-			target_box = boxes[1]
-		end
-		if target_box and target_box.component and target_box.component.winid then
-			vim.api.nvim_set_current_win(target_box.component.winid)
-		end
-	end
-	vim.defer_fn(set_initial_focus, 0)
+	end, 0)
 
 	return layout, components, boxes
 end
