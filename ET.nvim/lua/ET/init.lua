@@ -2,7 +2,7 @@ local M = {}
 local agent = require('ET.agent')
 
 -- Use for public setup via setup({})
-function M.setup(opts)
+function M.setup()
 	local bx = vim.fn.executable('bx')
 	local ctx7 = vim.fn.executable('ctx7')
 	if bx == 0 or ctx7 == 0 then

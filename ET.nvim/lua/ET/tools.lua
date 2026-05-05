@@ -12,9 +12,7 @@ function M.select_files(callback)
 					local file = fzf.path.entry_to_file(s)
 					table.insert(paths, file.path)
 				end
-				if callback then
-					callback(paths)
-				end
+				callback(paths)
 			end,
 		},
 	})
