@@ -1,5 +1,4 @@
 local M = {}
-local curl = require('plenary.curl')
 local ui = require('ET.ui')
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
@@ -84,20 +83,16 @@ function M.get_models()
 		url = url .. '?api_key=' .. cfg.api_key
 	end
 
-	local response = curl.get(url, {
-		timeout = 10000,
-		headers = {
-			Authorization = 'Bearer ' .. cfg.api_key,
-			['Content-Type'] = 'application/json',
-		},
-	})
+	local cmd = string.format('curl -s -H "Authorization: Bearer %s" -H "Content-Type: application/json" %s',
+		cfg.api_key, vim.fn.shellescape(url))
+	local result = vim.fn.system(cmd)
 
-	if response.status ~= 200 then
+	if vim.v.shell_error ~= 0 then
 		vim.notify('ET.nvim: Failed to fetch models from ' .. cfg.endpoint, vim.log.levels.ERROR)
 		return {}
 	end
 
-	local ok, decoded = pcall(vim.fn.json_decode, response.body)
+	local ok, decoded = pcall(vim.fn.json_decode, result)
 	if not ok or not decoded.data then
 		vim.notify('ET.nvim: Failed to parse models response', vim.log.levels.ERROR)
 		return {}
