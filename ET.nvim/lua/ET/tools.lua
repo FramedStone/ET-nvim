@@ -110,25 +110,19 @@ function M.read_file(filepath)
 	return table.concat(lines, '\n')
 end
 
--- Detects and fixes accidental Lua/JS string-literal wrapping in content.
--- E.g. model sends "hello" or "line1\\nline2" instead of raw text.
--- Strips outer matching quotes; JSON-decodes inner if it has escape sequences.
 local function sanitize_content(contents)
 	if type(contents) ~= 'string' then
 		return contents
 	end
 	local first = contents:sub(1, 1)
 	if (first == '"' or first == "'") and first == contents:sub(-1) then
-		local inner = contents:sub(2, -2)
-		if inner:find('\\n') or inner:find('\\t') then
-			-- Re-wrap as JSON string literal → decode handles all escapes
-			local ok, decoded = pcall(vim.fn.json_decode, '"' .. inner .. '"')
-			if ok and type(decoded) == 'string' then
-				return decoded
-			end
+		-- Try JSON decode first (handles all escape sequences: \n, \t, \", \\, etc.)
+		local ok, decoded = pcall(vim.fn.json_decode, contents)
+		if ok and type(decoded) == 'string' then
+			return decoded
 		end
-		-- No escape sequences: just strip the accidental wrapping quotes
-		return inner
+		-- Not valid JSON: just strip the wrapping quotes
+		return contents:sub(2, -2)
 	end
 	return contents
 end

@@ -19,13 +19,13 @@ vim.api.nvim_create_user_command('ETSwitchModel', function()
 		local model_name = type(selected) == 'table' and selected.text or selected
 		local cfg = config.get_config()
 		cfg.model = model_name
-		config.set_config(cfg)
+		config.save_config(cfg)
 		vim.notify('ET.nvim: Switched to model ' .. model_name)
 	end, '30%', #model_items + 1)
 end, { desc = 'Switch ET model' })
 
 vim.api.nvim_create_user_command('ETEditSettings', function()
-	config.set_config()
+	config.edit_config_ui()
 end, { desc = 'Edit ET configuration' })
 
 vim.api.nvim_create_user_command('ETFilePicker', function()
@@ -422,9 +422,6 @@ vim.api.nvim_create_user_command('ETContext7', function()
 				table.insert(nodes, Tree.Node({ id = 'sep-' .. i, text = '', _is_separator = true }))
 			end
 
-			-- Store codeList and infoSnippets in state
-			states.set_context7_docs(pruned, results.infoSnippets or {})
-
 			if docs_result_tree then
 				docs_result_tree:set_nodes(nodes)
 				docs_result_tree:render()
@@ -768,7 +765,7 @@ vim.api.nvim_create_user_command('ETSystemPrompt', function()
 		local content = table.concat(new_lines, '\n'):gsub('%s*$', '')
 		local cfg = config.get_config()
 		cfg.system_prompt = content
-		config.set_config(cfg)
+		config.save_config(cfg)
 		states._system_prompt_additions = {}
 		states.save()
 		popup:unmount()
