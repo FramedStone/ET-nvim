@@ -206,6 +206,9 @@ to run `:ETInstallTools`.
 | `<C-w>j` | Focus component below |
 | `<C-w>k` | Focus component above |
 | `<C-w>l` | Focus component to the right |
+| `<Tab>` | Cycle to next component |
+| `<S-Tab>` | Cycle to previous component |
+| `<C-w>w`, `<C-w><C-w>` | Cycle to next Neovim window |
 
 ### Tree components (search results)
 

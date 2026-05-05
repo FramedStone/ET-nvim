@@ -447,6 +447,9 @@ Standard in all ET.nvim popups: >
   <C-w>j       Focus component below (layouts)
   <C-w>k       Focus component above (layouts)
   <C-w>l       Focus component to the right (layouts)
+  <Tab>        Cycle to next component
+  <S-Tab>      Cycle to previous component
+  <C-w>w, <C-w><C-w> Cycle to next Neovim window
 <
                                               *ET-keybindings-trees*
 Tree components (search results): >

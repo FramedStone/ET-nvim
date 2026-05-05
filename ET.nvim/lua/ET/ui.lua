@@ -243,6 +243,22 @@ local function find_first_focusable(box)
 	return nil
 end
 
+--- Within a sibling box, try to find the component at the same relative
+--- position as our current component (using the next-deeper path entry's
+--- index). Falls back to the first focusable component in the box.
+local function find_aligned_focusable(sibling_box, deeper_entry)
+	if deeper_entry and type(sibling_box) == 'table' then
+		local aligned = sibling_box[deeper_entry.index]
+		if aligned then
+			local target = find_first_focusable(aligned)
+			if target and target.winid and vim.api.nvim_win_is_valid(target.winid) then
+				return target
+			end
+		end
+	end
+	return find_first_focusable(sibling_box)
+end
+
 --- Walk box-tree path to find the sibling in a given axis direction.
 --- @param path table[] the component's path through the box tree
 --- @param axis_dir string 'row' (left/right) or 'col' (up/down)
@@ -257,17 +273,22 @@ local function navigate_sibling(path, axis_dir, direction)
 			while idx >= 1 and idx <= #entry.box_list do
 				local sibling_box = entry.box_list[idx]
 				if sibling_box then
-					local target = find_first_focusable(sibling_box)
+					-- Aligned navigation: use next-deeper path entry's index
+					-- to find the component at the same relative position.
+					-- E.g. LibraryInput(col[2]) → right → DocsLibInput(col[2])
+					local target = find_aligned_focusable(sibling_box, path[level + 1])
 					if target and target.winid and vim.api.nvim_win_is_valid(target.winid) then
 						return target
 					end
 				end
 				idx = idx + direction
 			end
-			return nil -- reached edge
+			-- No sibling in this direction at this nesting level.
+			-- Fall through to try a shallower ancestor (don't return nil —
+			-- a grandparent may span the desired axis).
 		end
 	end
-	return nil -- no matching axis ancestor
+	return nil -- truly at the outermost boundary, no ancestor spans this axis
 end
 
 --- Creates a layout with multiple nui components arranged vertically.
@@ -343,12 +364,52 @@ function M.create_layout(width, height, boxes, direction)
 	-- child popups (which creates windows) but does NOT call mount()
 	-- (which would apply stored keymaps). After mount, popup:map()
 	-- writes directly to vim.keymap.set with the correct bufnr.
+	--
+	-- Navigation fix: <C-w> is a Neovim built-in command prefix that enters
+	-- "window command mode" at the C level, BEFORE buffer-local mappings are
+	-- evaluated. In floating windows, even nowait=true may not reliably
+	-- prevent <C-w>h from falling through to Neovim's default window nav.
+	--
+	-- Solution: map <C-w> to <Nop> (without nowait) to suppress window-command
+	-- mode while still allowing <C-w>h/j/k/l (with nowait) to work. Also add
+	-- <M-h/j/k/l> as a reliable, interception-free fallback.
 	if #components > 1 then
 		for _, comp in ipairs(components) do
+			-- Suppress built-in window-command mode (no nowait → waits for h/j/k/l)
+			comp:map('n', '<C-w>', '<Nop>', { noremap = true })
+			-- Internal layout navigation (with nowait for instant response)
 			comp:map('n', '<C-w>h', function() focus_direction('row', -1) end, { noremap = true, nowait = true })
 			comp:map('n', '<C-w>l', function() focus_direction('row', 1) end, { noremap = true, nowait = true })
 			comp:map('n', '<C-w>k', function() focus_direction('col', -1) end, { noremap = true, nowait = true })
 			comp:map('n', '<C-w>j', function() focus_direction('col', 1) end, { noremap = true, nowait = true })
+			-- Allow cycling to next Neovim window via <C-w>w / <C-w><C-w>
+			comp:map('n', '<C-w>w', '<Cmd>wincmd w<CR>', { noremap = true, nowait = true })
+			comp:map('n', '<C-w><C-w>', '<Cmd>wincmd w<CR>', { noremap = true, nowait = true })
+			-- <Tab> / <S-Tab> cycle through all components (depth-first order)
+			comp:map('n', '<Tab>', function()
+				local win = vim.api.nvim_get_current_win()
+				for i, c in ipairs(components) do
+					if c.winid == win then
+						local next_c = components[i % #components + 1]
+						if next_c and next_c.winid and vim.api.nvim_win_is_valid(next_c.winid) then
+							vim.api.nvim_set_current_win(next_c.winid)
+						end
+						return
+					end
+				end
+			end, { noremap = true, nowait = true })
+			comp:map('n', '<S-Tab>', function()
+				local win = vim.api.nvim_get_current_win()
+				for i, c in ipairs(components) do
+					if c.winid == win then
+						local prev_c = components[(i - 2) % #components + 1]
+						if prev_c and prev_c.winid and vim.api.nvim_win_is_valid(prev_c.winid) then
+							vim.api.nvim_set_current_win(prev_c.winid)
+						end
+						return
+					end
+				end
+			end, { noremap = true, nowait = true })
 		end
 	end
 
