@@ -123,16 +123,15 @@ vim.api.nvim_create_user_command('ETBraveSearch', function()
 				local url = res.url or ''
 
 				local result_copy = vim.tbl_deep_extend('force', {}, res)
-				if selected_type == 'videos' and result_copy.thumbnail then
+				if selected_type == 'images' and result_copy.thumbnail then
+					result_copy.url = result_copy.thumbnail
+				elseif selected_type == 'videos' and result_copy.thumbnail then
 					result_copy.url = result_copy.thumbnail
 				end
 
-				-- Build children: URL + type-specific fields
+				-- Build children
 				local children = {}
-				if selected_type == 'images' then
-					local thumb = res.thumbnail or url
-					table.insert(children, Tree.Node({ id = 'url-' .. i, text = '  ' .. thumb, _is_child = true, _url = thumb }))
-				elseif url ~= '' then
+				if url ~= '' then
 					table.insert(children, Tree.Node({ id = 'url-' .. i, text = '  ' .. url, _is_child = true, _url = url }))
 				end
 
