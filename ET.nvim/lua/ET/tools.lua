@@ -227,17 +227,62 @@ end
 
 ---------------------------------- External Tools -----------------------------------------------
 function M.setup_external_tools()
-	if vim.fn.has('mac') then
-		-- Install bx (brave-search-cli), ctx7, jq
-		vim.cmd(
-			'terminal curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh && brew install ctx7 jq'
-		)
-	else
-		-- Install bx, ctx7, jq (using chocolatey for jq)
-		vim.cmd(
-			'terminal powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.ps1 | iex; choco install jq -y; bun install ctx7"'
-		)
+	local function has(cmd)
+		return vim.fn.executable(cmd) == 1
 	end
+
+	local cmds = {}
+
+	-- bx (Brave Search CLI)
+	if not has('bx') then
+		if vim.fn.has('mac') or not vim.fn.has('win32') then
+			table.insert(cmds, 'curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh')
+		else
+			table.insert(cmds, 'powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.ps1 | iex"')
+		end
+	end
+
+	-- ctx7
+	if not has('ctx7') then
+		if vim.fn.has('mac') then
+			table.insert(cmds, 'brew install ctx7')
+		elseif vim.fn.has('win32') then
+			table.insert(cmds, 'npm install -g ctx7')
+		else
+			table.insert(cmds, 'npm install -g ctx7')
+		end
+	end
+
+	-- jq
+	if not has('jq') then
+		if vim.fn.has('mac') then
+			table.insert(cmds, 'brew install jq')
+		elseif vim.fn.has('win32') then
+			table.insert(cmds, 'choco install jq -y')
+		else
+			table.insert(cmds, 'sudo apt-get install -y jq')
+		end
+	end
+
+	-- lynx
+	if not has('lynx') then
+		if vim.fn.has('mac') then
+			table.insert(cmds, 'brew install lynx')
+		elseif vim.fn.has('win32') then
+			table.insert(cmds, 'choco install lynx -y')
+		else
+			table.insert(cmds, 'sudo apt-get install -y lynx')
+		end
+	end
+
+	if #cmds == 0 then
+		vim.notify('ET.nvim: All external tools are already installed', vim.log.levels.INFO)
+		return
+	end
+
+	local install_cmd = table.concat(cmds, ' && ')
+	vim.notify('ET.nvim: Installing ' .. #cmds .. ' missing tool(s)...', vim.log.levels.INFO)
+	vim.cmd('terminal ' .. install_cmd)
 end
 
 -- BraveSearch
