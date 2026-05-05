@@ -47,7 +47,7 @@ The human researches, the agent executes — each doing what they're best at.
 | External | `ctx7` | Context7 documentation CLI |
 | External | `lynx` | HTML-to-text for web_fetch (optional on Windows) |
 | External | `jq` | JSON filtering for Brave Search results |
-| External | `fixjson` | JSON formatting for config |
+| Optional | `fixjson` | JSON formatter (install via Mason or `npm i -g fixjson`) |
 
 Run `:ETInstallTools` to install all external tools in one command.
 
