@@ -122,8 +122,8 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	local cmd = {
 		'curl', '-s', '-N', '-X', 'POST',
 		'-H', 'Content-Type: application/json',
-		'-d',
-	table.insert(cmd, vim.fn.json_encode(payload))
+		'-d', vim.fn.json_encode(payload),
+	}
 	table.insert(cmd, url)
 
 	local full_content = {}
