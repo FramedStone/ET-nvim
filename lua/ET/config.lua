@@ -135,7 +135,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	-- and llama.cpp flat format {name, arguments}.
 	local function accumulate_tool_call(tc)
 		local idx = tc.index + 1
-		local fn = tc.function or tc
+		local fn = tc['function'] or tc
 		if not tool_calls[idx] then
 			tool_calls[idx] = {
 				id = tc.id or '',
