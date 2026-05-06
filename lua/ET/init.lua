@@ -5,11 +5,11 @@ local agent = require('ET.agent')
 -- Public setup. Accepts an opts table that deep-merges into config.json.
 --
 -- Usage via lazy.nvim:
---   opts = { endpoint = 'http://localhost:8000/v1', model = 'llama3' }
+--   opts = { endpoint = 'http://localhost:8080/v1', model = 'my-model' }
 --
 -- Or explicit config function:
 --   config = function()
---     require('ET').setup({ api_key = 'sk-...' })
+--     require('ET').setup({ model = 'my-model' })
 --   end
 function M.setup(opts)
 	-- Merge user opts into config (saves to disk so :ETEditSettings stays in sync)

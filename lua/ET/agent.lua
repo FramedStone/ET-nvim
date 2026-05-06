@@ -13,7 +13,13 @@ function M.init()
 			cfg.model = models[1]
 			config.save_config(cfg)
 		else
-			-- User needs to configure endpoint; run :ETEditSettings
+			vim.notify(
+				'ET.nvim: No models found at ' .. cfg.endpoint .. '\n'
+				.. '  Make sure llama-server is running.\n'
+				.. '  Example: llama-server -m model.gguf --port 8080\n'
+				.. '  Run :ETEditSettings to configure endpoint',
+				vim.log.levels.WARN
+			)
 		end
 	end
 end

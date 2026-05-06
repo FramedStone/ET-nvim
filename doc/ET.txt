@@ -65,8 +65,8 @@ lazy.nvim (recommended): >
       'ibhagwan/fzf-lua',
     },
     opts = {
-      endpoint = 'http://localhost:8000/v1',
-      -- model = 'llama3',
+      endpoint = 'http://localhost:8080/v1',
+      model = 'my-model',
     },
   }
 <
@@ -80,7 +80,7 @@ With custom keymaps: >
       { '<leader>eb', ':ETBraveSearch<CR>',  desc = 'ET Brave Search' },
       { '<leader>ec', ':ETContext7<CR>',     desc = 'ET Context7' },
     },
-    opts = { endpoint = 'http://localhost:8000/v1' },
+    opts = { model = 'my-model' },
   }
 <
 
@@ -88,8 +88,8 @@ With custom keymaps: >
 Explicit config function: >
 
   require('ET').setup({
-    endpoint = 'http://localhost:8000/v1',
-    api_key  = 'sk-...',
+    endpoint = 'http://localhost:8080/v1',
+    model = 'my-model',
   })
 <
 
@@ -104,8 +104,7 @@ Configuration is stored at |stdpath()| + '/.et/config.json'.
                                               *ET-config-defaults*
 Default values: >
 
-  endpoint      = 'http://localhost:8000/v1'
-  api_key       = ''   (falls back to $ET_API_KEY)
+  endpoint      = 'http://localhost:8080/v1'
   model         = nil   (auto-picks first available)
   system_prompt = 'You are an agent that acts only through tools. ...'
   sampling_params = {
@@ -116,8 +115,8 @@ Default values: >
     repetition_penalty  = nil,
     presence_penalty    = nil,
     chat_template_kwargs = {
-      enable_thinking  = true,
-      reasoning_effort = nil,
+      enable_thinking  = nil,    (boolean: for DeepSeek-R1 / Qwen-thinking)
+      thinking_budget  = nil,    (integer: max tokens for reasoning)
     },
   }
 <
@@ -140,19 +139,8 @@ Commands for configuration:
   `:ETSwitchModel`     Pick from available models on the endpoint.
   `:ETSystemPrompt`    View and edit the full system prompt.
 
-                                              *ET-config-api-key*
-The `api_key` field can be omitted from the config file entirely.
-ET.nvim checks these sources in order:
-  1. `config.json` → `api_key` field
-  2. `$ET_API_KEY` environment variable
-If neither is set, requests are sent without an Authorization header.
-
-When using oMLX, the `--api-key` flag on `omlx serve` sets the
-server-side key. See https://github.com/jundot/omlx#cli-configuration .
-The value must match between server and client.
-
 The model is auto-set to the first available model on first run if none
-is configured.
+is configured. llama-server does not require authentication.
 
 ==============================================================================
 5. COMMANDS                                    *ET-commands*
