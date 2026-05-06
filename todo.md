@@ -1,9 +1,6 @@
 - [x] move ETOnboard into commands.lua
 - [x] config.lua
 - [x] reusable nui popup
-- [x] ETOnboard
-    - oMLX endpoint
-    - api key
 - [x] ETSwitchModel
 - [x] ETEditSettings (config.json)
 - [x] ETFilePicker
@@ -40,8 +37,15 @@
 - [x] pr flow for any edits
     - vimdiff
 - [x] refactor codebase: decouple modules and simplify
-- [ ] doc and readme update
+- [x] doc and readme update
     - LICENSE set as highest privacy
+- [x] migrate to llama.cpp as the provider
+    - default endpoint :8000 → :8080
+    - dual finish_reason ('tool_calls' | 'tool')
+    - dual-format accumulate_tool_call (nested | flat)
+    - remove ?api_key= query param from /models
+    - chat_template_kwargs: reasoning_effort → thinking_budget
+    - better init() missing-models message
 - [ ] quickfix integration
 - [ ] diagnosis integration
 - [ ] nvim extended tools (e.g. func definition, symbols, func implementation)

@@ -2,8 +2,8 @@ local M = {}
 local ui = require('ET.ui')
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
-	endpoint = 'http://localhost:8000/v1',
-	api_key = '',
+	provider = 'llama.cpp',
+	endpoint = 'http://localhost:8080/v1',
 	model = vim.NIL,
 	sampling_params = {
 		temperature = vim.NIL,
@@ -13,8 +13,8 @@ local config = {
 		repetition_penalty = vim.NIL,
 		presence_penalty = vim.NIL,
 		chat_template_kwargs = {
-			enable_thinking = true,
-			reasoning_effort = vim.NIL,
+			enable_thinking = vim.NIL,
+			thinking_budget = vim.NIL,
 		},
 	},
 	system_prompt = 'You are an agent that acts only through tools. You must respond only with a JSON tool call, with no text before or after.',
@@ -30,14 +30,6 @@ function M.get_config()
 		end
 	end
 	cfg = cfg or vim.deepcopy(config)
-
-	-- api_key: env var fallback if config value is empty
-	if cfg.api_key == '' then
-		local env_key = os.getenv('ET_API_KEY')
-		if env_key then
-			cfg.api_key = env_key
-		end
-	end
 
 	return cfg
 end
@@ -85,12 +77,9 @@ end
 function M.get_models()
 	local cfg = M.get_config()
 	local url = cfg.endpoint .. '/models'
-	if cfg.api_key ~= '' then
-		url = url .. '?api_key=' .. cfg.api_key
-	end
 
-	local cmd = string.format('curl -s -H "Authorization: Bearer %s" -H "Content-Type: application/json" %s',
-		cfg.api_key, vim.fn.shellescape(url))
+	local cmd = string.format('curl -s -H "Content-Type: application/json" %s',
+		vim.fn.shellescape(url))
 	local result = vim.fn.system(cmd)
 
 	if vim.v.shell_error ~= 0 then
@@ -133,12 +122,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	local cmd = {
 		'curl', '-s', '-N', '-X', 'POST',
 		'-H', 'Content-Type: application/json',
-	}
-	if cfg.api_key and cfg.api_key ~= '' then
-		table.insert(cmd, '-H')
-		table.insert(cmd, 'Authorization: Bearer ' .. cfg.api_key)
-	end
-	table.insert(cmd, '-d')
+		'-d',
 	table.insert(cmd, vim.fn.json_encode(payload))
 	table.insert(cmd, url)
 
@@ -146,15 +130,18 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 	local tool_calls = {}
 	local state = 'streaming' -- 'streaming' | 'done'
 
-	-- Merge a streaming delta chunk into the accumulated tool_calls array
+	-- Merge a streaming delta chunk into the accumulated tool_calls array.
+	-- Handles both OpenAI nested format {function: {name, arguments}}
+	-- and llama.cpp flat format {name, arguments}.
 	local function accumulate_tool_call(tc)
 		local idx = tc.index + 1
+		local fn = tc.function or tc
 		if not tool_calls[idx] then
 			tool_calls[idx] = {
 				id = tc.id or '',
 				type = tc.type or 'function',
 				['function'] = {
-					name = tc['function'] and tc['function'].name or '',
+					name = fn.name or '',
 					arguments = '',
 				},
 			}
@@ -162,11 +149,11 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 		if tc.id and tc.id ~= '' then
 			tool_calls[idx].id = tc.id
 		end
-		if tc['function'] and tc['function'].name and tc['function'].name ~= '' then
-			tool_calls[idx]['function'].name = tc['function'].name
+		if fn.name and fn.name ~= '' then
+			tool_calls[idx]['function'].name = fn.name
 		end
-		if tc['function'] and tc['function'].arguments then
-			tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. tc['function'].arguments
+		if fn.arguments then
+			tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. fn.arguments
 		end
 	end
 
@@ -194,7 +181,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 				end
 			end
 
-			if choice.finish_reason == 'tool_calls' then
+			if choice.finish_reason == 'tool_calls' or choice.finish_reason == 'tool' then
 				on_tool_call(tool_calls)
 				tool_calls = {}
 				state = 'done'

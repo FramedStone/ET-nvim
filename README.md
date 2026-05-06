@@ -2,7 +2,7 @@
 
 > Human-First Neovim AI Agent — a stateless tool-calling agent with vimdiff review.
 
-Designed for [oMLX](https://github.com/jundot/omlx) and any OpenAI-compatible endpoint.
+Designed for [llama.cpp](https://github.com/ggerganov/llama.cpp) via `llama-server`.
 
 ---
 
@@ -66,9 +66,8 @@ Run `:ETInstallTools` to install all external tools in one command.
   },
   opts = {
     -- All fields optional — omit to configure later via :ETEditSettings
-    endpoint = 'http://localhost:8000/v1',
-    model = 'llama3',          -- omit to auto-pick first available model
-    -- api_key = 'sk-...',      -- or set $ET_API_KEY
+    endpoint = 'http://localhost:8080/v1',
+    model = 'my-model',         -- omit to auto-pick first available model
   },
 }
 ```
@@ -88,7 +87,7 @@ With custom keymaps:
     { '<leader>ec', ':ETContext7<CR>',     desc = 'ET Context7' },
     { '<leader>er', ':ETWebFetchResults<CR>', desc = 'ET Web Fetch Results' },
   },
-  opts = { endpoint = 'http://localhost:8000/v1' },
+  opts = { model = 'my-model' },
 }
 ```
 
@@ -100,8 +99,8 @@ Or explicit `config` function:
   dependencies = { 'MunifTanjim/nui.nvim', 'ibhagwan/fzf-lua' },
   config = function()
     require('ET').setup({
-      endpoint = 'http://localhost:8000/v1',
-      api_key = 'sk-...',
+      endpoint = 'http://localhost:8080/v1',
+      model = 'my-model',
     })
   end,
 }
@@ -115,35 +114,46 @@ with `:ETEditSettings`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `endpoint` | string | `http://localhost:8000/v1` | OpenAI-compatible API base URL |
-| `api_key` | string | `""` | API key (Bearer token). Falls back to `$ET_API_KEY`. |
+| `endpoint` | string | `http://localhost:8080/v1` | llama-server base URL |
 | `model` | string | auto | Model ID — omit to auto-pick first available |
 | `system_prompt` | string | tools-only prompt | Custom system prompt |
 | `sampling_params` | table | `{}` | Pass-through to `/chat/completions` |
 
-`sampling_params` supports all standard fields:
+`sampling_params` supports all standard fields. These are passed directly
+to the API — any field set to `nil` is omitted (falls back to the server's defaults).
 
 ```lua
 sampling_params = {
   temperature = 0.7,
   max_tokens = 4096,
   top_p = 0.9,
-  -- top_k, repetition_penalty, presence_penalty, etc.
+  -- top_k, repetition_penalty, presence_penalty, seed, stop, etc.
   chat_template_kwargs = {
-    enable_thinking = true,
-    -- reasoning_effort = 'medium',
+    enable_thinking = true,   -- boolean: for DeepSeek-R1 / Qwen-thinking models
+    thinking_budget = 4096,   -- integer: max tokens for reasoning (-1 = unlimited)
   },
 }
 ```
 
-Any field set to `nil` is omitted from the API request (falls back to the
-server's defaults).
+`chat_template_kwargs` are passed into the model's Jinja template. Available
+keys depend on the model — the two above are the most common.
 
 ---
 
+## Quick Start
+
+1. Start llama-server:
+   ```bash
+   llama-server -m model.gguf --port 8080 --alias my-model
+   ```
+   > Jinja templating is enabled by default. No extra flags needed.
+   > Use a tool-calling-capable model (Qwen 2.5, Llama 3.1+, Mistral, etc.).
+
+2. Install ET.nvim (see [Installation](#installation)). `:ET` to chat.
+
 ## First Run
 
-1. `:ETEditSettings` — review or edit the endpoint and API key
+1. `:ETEditSettings` — review or edit the endpoint and model
 2. `:ETSwitchModel` — pick a model from the available list
 3. `:ET` — open the chat popup, type a prompt, press `:w<CR>` to send
 
