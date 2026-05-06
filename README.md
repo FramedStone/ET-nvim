@@ -1,6 +1,6 @@
 # ET.nvim
 
-> Human-First Neovim AI Agent — a stateless tool-calling agent with vimdiff review.
+> Human-First Neovim AI Agent — a stateless tool-calling agent made for local models.
 
 Designed for [llama.cpp](https://github.com/ggerganov/llama.cpp) via `llama-server`.
 

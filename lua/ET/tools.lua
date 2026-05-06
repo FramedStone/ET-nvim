@@ -54,7 +54,18 @@ function M.find_files(filenames)
 end
 
 local function get_virtualized_lines(filepath)
-	local lines = vim.fn.readfile(filepath)
+	-- Read from the user's live buffer if the file is open (preserves unsaved
+	-- changes for co-editing). Falls back to disk if not open in any buffer.
+	local lines = nil
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) == filepath then
+			lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+			break
+		end
+	end
+	if not lines then
+		lines = vim.fn.readfile(filepath)
+	end
 
 	local pending = {}
 	for _, edit in ipairs(states.pending_edits) do
@@ -218,9 +229,25 @@ function M.stage_edit(filepath, start_line, end_line, contents)
 end
 
 function M.apply_edits(accepted)
+	-- Apply bottom-up so earlier edits don't shift line numbers for later edits.
+	table.sort(accepted, function(a, b)
+		return (a.start_line or 0) > (b.start_line or 0)
+	end)
+
 	for _, edit in ipairs(accepted) do
-		local bufnr = vim.fn.bufadd(edit.filepath)
-		vim.fn.bufload(bufnr)
+		-- Find the user's live buffer for this file to preserve unsaved changes
+		-- on other lines. Falls back to a fresh disk load if the file isn't open.
+		local bufnr = nil
+		for _, b in ipairs(vim.api.nvim_list_bufs()) do
+			if vim.api.nvim_buf_is_valid(b) and vim.api.nvim_buf_get_name(b) == edit.filepath then
+				bufnr = b
+				break
+			end
+		end
+		if not bufnr then
+			bufnr = vim.fn.bufadd(edit.filepath)
+			vim.fn.bufload(bufnr)
+		end
 
 		local content = edit.new_content
 		if type(content) == 'string' then
