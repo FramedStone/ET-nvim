@@ -183,33 +183,9 @@ function M.show_web_fetch_results()
 		states.ui.web_fetch_popup = nil
 	end
 
-	local function add_to_prompt()
-		local page = results[current_index]
-		local text = vim.fn.json_encode({
-			source = 'web_fetch',
-			url = page.url,
-			title = page.title,
-		})
-		M.add(text)
-		vim.notify('ET.nvim: Added web_fetch result to prompt context', vim.log.levels.INFO)
-	end
-
-	local function add_to_system_prompt()
-		local page = results[current_index]
-		local text = vim.fn.json_encode({
-			source = 'web_fetch',
-			url = page.url,
-			title = page.title,
-		})
-		states.add_to_system_prompt(text)
-		vim.notify('ET.nvim: Added web_fetch result to system prompt', vim.log.levels.INFO)
-	end
-
 	popup:map('n', 'l', nav_next, { noremap = true, nowait = true })
 	popup:map('n', 'h', nav_prev, { noremap = true, nowait = true })
 	ui.bind_save_close_keys(popup, function() vim.cmd('ETAddToPrompt') end, close)
-	popup:map('n', 'a', add_to_prompt, { noremap = true, nowait = true })
-	popup:map('n', 'A', add_to_system_prompt, { noremap = true, nowait = true })
 end
 
 -- Agent prompt loop (tool-only, no streaming to UI)
