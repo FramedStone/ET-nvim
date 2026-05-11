@@ -101,12 +101,24 @@ config file and saved to disk. They can be changed later with `:ETEditSettings`.
 
 Configuration is stored at |stdpath()| + '/.et/config.json'.
 
+                                              *ET-config-providers*
+ET.nvim supports multiple AI backends (providers):
+
+  `llama.cpp`   — llama-server (general GGUF models)
+  `ds4`         — ds4.c native DeepSeek V4 Flash engine
+
+Configure via `:ETEditSettings` by setting `provider`, `endpoint`, and `model`.
+Each provider has its own default endpoint and model.
+
                                               *ET-config-defaults*
 Default values: >
 
-  endpoint      = 'http://localhost:8080/v1'
-  model         = nil   (auto-picks first available)
-  system_prompt = 'You are an agent that acts only through tools. ...'
+  provider          = 'llama.cpp'
+  endpoint          = per-provider
+  model             = per-provider
+  api_key           = nil   (optional, for local ds4; required for remote)
+  reasoning_effort  = nil   (ds4 only: low, medium, high, max)
+  system_prompt     = 'You are an agent that acts only through tools. ...'
   sampling_params = {
     temperature         = nil,
     max_tokens          = nil,
@@ -114,11 +126,20 @@ Default values: >
     top_k               = nil,
     repetition_penalty  = nil,
     presence_penalty    = nil,
-    chat_template_kwargs = {
-      enable_thinking  = nil,    (boolean: for DeepSeek-R1 / Qwen-thinking)
-      thinking_budget  = nil,    (integer: max tokens for reasoning)
-    },
   }
+<
+
+Provider defaults: >
+
+  llama.cpp:
+    endpoint = 'http://localhost:8080/v1'
+    model    = nil   (auto-picks first available)
+    thinking via chat_template_kwargs (enable_thinking, thinking_budget)
+
+  ds4:
+    endpoint = 'http://127.0.0.1:8000/v1'
+    model    = 'deepseek-v4-flash'
+    thinking via reasoning_effort (low/medium/high/max)
 <
 
                                               *ET-config-sampling*
@@ -134,13 +155,31 @@ generation: >
   }
 <
 
+For `llama.cpp` provider, thinking is configured via `chat_template_kwargs`
+inside `sampling_params`: >
+
+  sampling_params = {
+    chat_template_kwargs = {
+      enable_thinking  = true,     -- for DeepSeek-R1 / Qwen-thinking
+      thinking_budget  = 4096,     -- max reasoning tokens
+    },
+  }
+<
+
+For `ds4` provider, thinking is configured via the top-level field: >
+
+  reasoning_effort = 'high'    -- low, medium, high, or max (Think Max)
+<
+
 Commands for configuration:
   `:ETEditSettings`    Edit config.json in a popup. `:w<CR>` to save.
   `:ETSwitchModel`     Pick from available models on the endpoint.
   `:ETSystemPrompt`    View and edit the full system prompt.
 
 The model is auto-set to the first available model on first run if none
-is configured. llama-server does not require authentication.
+is configured. llama-server does not require authentication. The ds4
+provider accepts an optional api_key (defaults to 'dsv4-local' for
+local usage).
 
 ==============================================================================
 5. COMMANDS                                    *ET-commands*

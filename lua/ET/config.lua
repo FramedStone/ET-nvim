@@ -1,10 +1,36 @@
 local M = {}
 local ui = require('ET.ui')
+
+-- Provider definitions with per-provider defaults and capabilities.
+local providers = {
+	['llama.cpp'] = {
+		default_endpoint = 'http://localhost:8080/v1',
+		default_model = vim.NIL,
+		description = 'llama.cpp via llama-server',
+		supports_api_key = false,
+		-- thinking mode is configured via sampling_params.chat_template_kwargs
+		-- tool calls: both OpenAI nested {function:{name, arguments}} and
+		--            llama.cpp flat {name, arguments}
+		-- finish_reason: "tool_calls" (OpenAI compat) or "tool" (llama.cpp legacy)
+	},
+	['ds4'] = {
+		default_endpoint = 'http://127.0.0.1:8000/v1',
+		default_model = 'deepseek-v4-flash',
+		description = 'ds4.c local inference engine for DeepSeek V4 Flash',
+		supports_api_key = true,
+		-- thinking mode uses body fields: thinking, reasoning_effort
+		-- tool calls: standard OpenAI format only
+		-- finish_reason: "tool_calls" only
+	},
+}
+
 local path = vim.fn.stdpath('config') .. '/.et/config.json'
 local config = {
 	provider = 'llama.cpp',
 	endpoint = 'http://localhost:8080/v1',
 	model = vim.NIL,
+	api_key = vim.NIL,
+	reasoning_effort = vim.NIL,
 	sampling_params = {
 		temperature = vim.NIL,
 		max_tokens = vim.NIL,
@@ -20,16 +46,60 @@ local config = {
 	system_prompt = 'You are an agent that acts only through tools. You must respond only with a JSON tool call, with no text before or after.',
 }
 
+--- Get the active provider's capability table.
+--- @return table provider config
+function M.get_provider()
+	local cfg = M.get_config()
+	return providers[cfg.provider] or providers['llama.cpp']
+end
+
+--- List all known provider IDs with their metadata.
+--- @return table[] {id, description, default_endpoint, default_model}[]
+function M.get_providers()
+	local items = {}
+	for id, prov in pairs(providers) do
+		table.insert(items, {
+			id = id,
+			description = prov.description,
+			default_endpoint = prov.default_endpoint,
+			default_model = prov.default_model,
+		})
+	end
+	table.sort(items, function(a, b) return a.id < b.id end)
+	return items
+end
+
+--- Get a provider's metadata by ID.
+--- @param id string
+--- @return table|nil
+function M.get_provider_info(id)
+	return providers[id]
+end
+
+--- Deep-merge user config on top of defaults.
+--- When switching providers, apply that provider's default endpoint and model
+--- if the user hasn't explicitly set them.
 function M.get_config()
 	local cfg
 	if vim.fn.filereadable(path) == 1 then
 		local content = vim.fn.readfile(path)
 		local ok, decoded = pcall(vim.fn.json_decode, table.concat(content, ''))
 		if ok then
-			cfg = vim.tbl_deep_extend('force', config, decoded)
+			cfg = vim.tbl_deep_extend('force', vim.deepcopy(config), decoded)
 		end
 	end
 	cfg = cfg or vim.deepcopy(config)
+
+	-- Apply provider defaults for unset fields
+	local prov = providers[cfg.provider]
+	if prov then
+		if cfg.endpoint == vim.NIL or cfg.endpoint == config.endpoint then
+			cfg.endpoint = prov.default_endpoint
+		end
+		if cfg.model == vim.NIL then
+			cfg.model = prov.default_model
+		end
+	end
 
 	return cfg
 end
@@ -74,12 +144,25 @@ function M.edit_config_ui()
 	end)
 end
 
+--- Fetch available models from the provider's /v1/models endpoint.
+--- Includes API key header for providers that need it.
 function M.get_models()
 	local cfg = M.get_config()
+	local prov = M.get_provider()
 	local url = cfg.endpoint .. '/models'
 
-	local cmd = string.format('curl -s -H "Content-Type: application/json" %s',
-		vim.fn.shellescape(url))
+	local headers = { 'Content-Type: application/json' }
+	if prov.supports_api_key and cfg.api_key and cfg.api_key ~= vim.NIL then
+		table.insert(headers, 'Authorization: Bearer ' .. cfg.api_key)
+	end
+
+	local header_args = {}
+	for _, h in ipairs(headers) do
+		table.insert(header_args, '-H')
+		table.insert(header_args, vim.fn.shellescape(h))
+	end
+
+	local cmd = 'curl -s ' .. table.concat(header_args, ' ') .. ' ' .. vim.fn.shellescape(url)
 	local result = vim.fn.system(cmd)
 
 	if vim.v.shell_error ~= 0 then
@@ -100,31 +183,84 @@ function M.get_models()
 	return models
 end
 
+--- Build the curl command and headers for a chat/completions request.
+--- Provider-specific differences are handled here:
+---   - API key header (ds4)
+---   - Thinking mode payload: llama.cpp uses chat_template_kwargs,
+---     ds4 uses thinking + reasoning_effort
+local function build_request(cfg, payload)
+	local prov = M.get_provider()
+	local url = cfg.endpoint .. '/chat/completions'
+
+	local headers = { 'Content-Type: application/json' }
+	if prov.supports_api_key and cfg.api_key and cfg.api_key ~= vim.NIL then
+		table.insert(headers, 'Authorization: Bearer ' .. cfg.api_key)
+	end
+
+	-- Build provider-specific payload additions
+	local body = vim.deepcopy(payload)
+
+	---@diagnostic disable-next-line: cast-local-type
+	body.stream = true
+
+	-- Merge sampling_params into body (this includes temperature, max_tokens, etc.)
+	-- nil fields are stripped in the loop below
+	if cfg.sampling_params then
+		body = vim.tbl_deep_extend('force', body, cfg.sampling_params)
+	end
+
+	-- Provider-specific thinking mode handling
+	if cfg.provider == 'ds4' then
+		-- ds4 uses thinking + reasoning_effort, NOT chat_template_kwargs
+		body.chat_template_kwargs = nil
+		if cfg.reasoning_effort and cfg.reasoning_effort ~= vim.NIL then
+			body.reasoning_effort = cfg.reasoning_effort
+		end
+		-- If the user hasn't explicitly disabled thinking, enable it by default
+		if body.thinking == nil then
+			body.thinking = { type = 'enabled' }
+		end
+	else
+		-- llama.cpp: keep chat_template_kwargs, remove thinking/reasoning_effort
+		body.thinking = nil
+		body.reasoning_effort = nil
+	end
+
+	-- Strip nil fields so the server gets clean JSON
+	local cleaned = {}
+	for k, v in pairs(body) do
+		if v ~= vim.NIL then
+			cleaned[k] = v
+		end
+	end
+
+	-- Build curl command
+	local curl_args = { 'curl', '-s', '-N', '-X', 'POST' }
+	for _, h in ipairs(headers) do
+		table.insert(curl_args, '-H')
+		table.insert(curl_args, h)
+	end
+	table.insert(curl_args, '-d')
+	table.insert(curl_args, vim.fn.json_encode(cleaned))
+	table.insert(curl_args, url)
+
+	return curl_args
+end
+
 function M._prompt(messages, on_tool_call, on_done, opts)
 	opts = opts or {}
 	local cfg = M.get_config()
-	local url = cfg.endpoint .. '/chat/completions'
 
 	local payload = {
 		model = cfg.model,
 		messages = messages,
-		stream = true,
 	}
 
 	if opts.tools then
 		payload.tools = opts.tools
 	end
 
-	if cfg.sampling_params then
-		payload = vim.tbl_deep_extend('force', payload, cfg.sampling_params)
-	end
-
-	local cmd = {
-		'curl', '-s', '-N', '-X', 'POST',
-		'-H', 'Content-Type: application/json',
-		'-d', vim.fn.json_encode(payload),
-	}
-	table.insert(cmd, url)
+	local cmd = build_request(cfg, payload)
 
 	local full_content = {}
 	local tool_calls = {}
@@ -181,6 +317,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 				end
 			end
 
+			-- Both providers use "tool_calls"; llama.cpp also sends "tool"
 			if choice.finish_reason == 'tool_calls' or choice.finish_reason == 'tool' then
 				on_tool_call(tool_calls)
 				tool_calls = {}

@@ -2,7 +2,9 @@
 
 > Human-First Neovim AI Agent — a stateless tool-calling agent made for local models.
 
-Designed for [llama.cpp](https://github.com/ggerganov/llama.cpp) via `llama-server`.
+Supports [llama.cpp](https://github.com/ggerganov/llama.cpp) via `llama-server`
+and [ds4.c](https://github.com/antirez/ds4) — the native DeepSeek V4 Flash inference engine.
+Configure the provider via `:ETEditSettings` or `setup()` opts.
 
 ---
 
@@ -114,10 +116,23 @@ with `:ETEditSettings`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `endpoint` | string | `http://localhost:8080/v1` | llama-server base URL |
-| `model` | string | auto | Model ID — omit to auto-pick first available |
+| `provider` | string | `llama.cpp` | Backend: `llama.cpp` or `ds4` |
+| `endpoint` | string | per-provider | Provider-specific base URL |
+| `model` | string | per-provider | Model ID (auto for llama.cpp, `deepseek-v4-flash` for ds4) |
+| `api_key` | string | — | API key (required for remote providers, optional for ds4 local) |
+| `reasoning_effort` | string | — | ds4 only: `low`, `medium`, `high`, or `max` for Think Max |
 | `system_prompt` | string | tools-only prompt | Custom system prompt |
 | `sampling_params` | table | `{}` | Pass-through to `/chat/completions` |
+
+### Provider Defaults
+
+When switching providers, set the `provider`, `endpoint`, and `model` fields
+via `:ETEditSettings`. Defaults per provider:
+
+| Provider | Default Endpoint | Default Model |
+|----------|-----------------|---------------|
+| `llama.cpp` | `http://localhost:8080/v1` | auto (first available via `/v1/models`) |
+| `ds4` | `http://127.0.0.1:8000/v1` | `deepseek-v4-flash` |
 
 `sampling_params` supports all standard fields. These are passed directly
 to the API — any field set to `nil` is omitted (falls back to the server's defaults).
@@ -169,6 +184,7 @@ to run `:ETInstallTools`.
 |---------|-------------|
 | `:ET [range]` | Open chat popup. Visual range pre-fills the selection with file path and line anchor. `:w<CR>` to send. |
 | `:ETSwitchModel` | Menu to pick from available models on the configured endpoint |
+
 | `:ETEditSettings` | Edit `config.json` in a popup. `:w<CR>` to save. |
 | `:ETFilePicker` | fzf-lua file picker. Selected paths are inserted into the current buffer. |
 | `:ETBraveSearch` | Brave Search UI — type selector (web/news/images/videos), query input, result tree |
