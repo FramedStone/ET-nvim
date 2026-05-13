@@ -255,14 +255,14 @@ with a fresh conversation — there is no persistent chat history.
      tool calls (not conversational text)
   5. Each tool is dispatched and its result is fed back into the
      conversation
-  6. The loop repeats until the LLM calls the `done` tool
+  6. The loop repeats until the LLM decides to stop making tool
+     calls and provides a final summary
   7. If any edits were staged, a vimdiff review opens (see |ET-review|)
   8. Accepted edits are written to disk
   9. Web fetch results are shown if any pages were fetched
 
-The system prompt instructs the model to respond ONLY with tool calls.
-This keeps the agent focused and prevents conversational responses that
-waste tokens.
+The system prompt instructs the model to call tools to modify code
+and provide a summary when finished.
 
 ==============================================================================
 7. TOOLS                                       *ET-tools*
@@ -287,7 +287,7 @@ edit_file(filepath, oldText, newText) ~
   (virtualized) file and replaced with `newText`. No line numbers
   are needed — the agent copy-pastes exact text from `read_file`
   output. Edits are STAGED, not applied. They are reviewed via
-  vimdiff after the agent calls `done`.
+  vimdiff when the agent finishes.
 
   The edit will fail with a helpful error if:
     - `oldText` cannot be found in the file
@@ -306,12 +306,6 @@ web_fetch(url, query?) ~
   matching lines with ±2 lines of context (up to 25 matches).
 
   Content is truncated to 20,000 lines per page.
-
-                                              *ET-tool-done*
-done(message) ~
-  Signal task completion. The message is shown as a vim.notify.
-  Triggers the edit review flow if any edits were staged.
-  This is the ONLY way the agent terminates the loop.
 
 ==============================================================================
 8. BRAVE SEARCH                                *ET-bravesearch*
@@ -447,7 +441,7 @@ prompt only, and cleared when the agent completes.
 ==============================================================================
 12. EDIT REVIEW                                 *ET-review*
 
-After the agent calls `done` with staged edits, a vimdiff review opens
+After the agent finishes with staged edits, a vimdiff review opens
 for each edit:
 
   Left window:   Original text
