@@ -43,7 +43,7 @@ local config = {
 			thinking_budget = vim.NIL,
 		},
 	},
-	system_prompt = 'You are an agent that acts only through tools. You must respond only with a JSON tool call, with no text before or after.',
+	system_prompt = 'You are an AI coding assistant that modifies code using available tools.',
 }
 
 --- Get the active provider's capability table.
