@@ -240,8 +240,6 @@ function M.prompt()
 
 			table.insert(msgs, assistant_msg)
 
-			local should_stop = false
-
 			for _, tc in ipairs(tool_calls) do
 				local tool_name = tc['function'].name
 				vim.notify('ET.nvim: Calling tool → ' .. tool_name, vim.log.levels.INFO)
@@ -251,10 +249,6 @@ function M.prompt()
 					local success, tool_result = pcall(tools.dispatch, tool_name, args)
 					if success then
 						result = vim.fn.json_encode(tool_result)
-						if tool_result and tool_result.stop then
-							should_stop = true
-							vim.notify('Agent: ' .. (tool_result.message or ''), vim.log.levels.INFO)
-						end
 					else
 						result = vim.fn.json_encode({ error = tostring(tool_result) })
 					end
@@ -268,20 +262,6 @@ function M.prompt()
 					tool_call_id = tc.id,
 					content = result,
 				})
-			end
-
-			if should_stop then
-				states._current_prompt_context = {}
-				if #states.pending_edits > 0 then
-					local review = require('ET.review')
-					review.review(states.pending_edits, function()
-						states.pending_edits = {}
-						M.show_web_fetch_results()
-					end)
-				else
-					M.show_web_fetch_results()
-				end
-				return
 			end
 
 			loop(msgs)

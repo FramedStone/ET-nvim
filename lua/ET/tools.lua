@@ -705,20 +705,7 @@ M.tool_definitions = {
 			},
 		},
 	},
-	{
-		type = 'function',
-		['function'] = {
-			name = 'done',
-			description = 'Call when the task is complete. Summarize what was accomplished.',
-			parameters = {
-				type = 'object',
-				properties = {
-					message = { type = 'string', description = 'Summary of what was done' },
-				},
-				required = { 'message' },
-			},
-		},
-	},
+
 }
 
 function M.dispatch(name, args)
@@ -730,8 +717,6 @@ function M.dispatch(name, args)
 		return M.edit_file(args.filepath, args.oldText, args.newText)
 	elseif name == 'web_fetch' then
 		return M.web_fetch(args.url, args.query)
-	elseif name == 'done' then
-		return { stop = true, message = args.message or 'Task completed' }
 	end
 	local names = {}
 	for _, t in ipairs(M.tool_definitions) do
