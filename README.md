@@ -11,7 +11,7 @@ Configure the provider via `:ETEditSettings` or `setup()` opts.
 ## Features
 
 - **Stateless agent** — fresh context per invocation, no stale conversations
-- **Agent Tool-calling loop** — `find_files`, `read_file`, `edit_file`, `web_fetch`, `done`
+- **Agent Tool-calling loop** — `find_files`, `read_file`, `edit_file`, `web_fetch`
 - **Vimdiff review** — inspect every change side-by-side before it's written to disk
 - **Brave Search** — web, news, images, videos with result trees
 - **Context7** — library documentation lookup with dual-panel UI
@@ -204,9 +204,9 @@ to run `:ETInstallTools`.
 flowchart TD
     A[":ET → type prompt → :w<CR>"] --> B["LLM (streaming)"]
     B -->|"tool calls"| C["Dispatch tools:<br/>find_files / read_file<br/>edit_file (staged)<br/>web_fetch (cached)"]
-    C -->|"results"| D{"done?"}
-    D -->|"no, more tools"| B
-    D -->|"yes"| E["Vimdiff review<br/>⏎ accept | q decline | :q decline all<br/>l next | h previous"]
+    C -->|"results"| D{"more tools?"}
+    D -->|"yes"| B
+    D -->|"no"| E["Vimdiff review<br/>⏎ accept | q decline | :q decline all<br/>l next | h previous"]
     E --> F["Edits written to disk"]
 ```
 
