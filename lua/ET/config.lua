@@ -17,7 +17,7 @@ local providers = {
 		default_endpoint = 'http://127.0.0.1:8000/v1',
 		default_model = 'deepseek-v4-flash',
 		description = 'ds4.c local inference engine for DeepSeek V4 Flash',
-		supports_api_key = true,
+		supports_api_key = false,
 		-- thinking mode uses body fields: thinking, reasoning_effort
 		-- tool calls: standard OpenAI format only
 		-- finish_reason: "tool_calls" only
@@ -273,22 +273,26 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 		local idx = tc.index + 1
 		local fn = tc['function'] or tc
 		if not tool_calls[idx] then
+			local id = tc.id
+			if id == nil or id == vim.NIL then id = '' end
+			local name = fn.name
+			if name == nil or name == vim.NIL then name = '' end
 			tool_calls[idx] = {
-				id = tc.id or '',
+				id = id,
 				type = tc.type or 'function',
 				['function'] = {
-					name = fn.name or '',
+					name = name,
 					arguments = '',
 				},
 			}
 		end
-		if tc.id and tc.id ~= '' then
+		if tc.id ~= nil and tc.id ~= vim.NIL and tc.id ~= '' then
 			tool_calls[idx].id = tc.id
 		end
-		if fn.name and fn.name ~= '' then
+		if fn.name ~= nil and fn.name ~= vim.NIL and fn.name ~= '' then
 			tool_calls[idx]['function'].name = fn.name
 		end
-		if fn.arguments then
+		if fn.arguments ~= nil and fn.arguments ~= vim.NIL then
 			tool_calls[idx]['function'].arguments = tool_calls[idx]['function'].arguments .. fn.arguments
 		end
 	end
@@ -307,11 +311,11 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 			local delta = choice.delta
 			if not delta then goto continue end
 
-			if delta.content then
+			if delta.content ~= nil and delta.content ~= vim.NIL then
 				table.insert(full_content, delta.content)
 			end
 
-			if delta.tool_calls then
+			if delta.tool_calls ~= nil and delta.tool_calls ~= vim.NIL then
 				for _, tc in ipairs(delta.tool_calls) do
 					accumulate_tool_call(tc)
 				end

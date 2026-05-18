@@ -242,8 +242,28 @@ function M.prompt()
 
 			for _, tc in ipairs(tool_calls) do
 				local tool_name = tc['function'].name
-				vim.notify('ET.nvim: Calling tool → ' .. tool_name, vim.log.levels.INFO)
+
+				-- Build a human-readable summary of key arguments
 				local ok, args = pcall(vim.fn.json_decode, tc['function'].arguments)
+				local arg_summary = ''
+				if ok and type(args) == 'table' then
+					if tool_name == 'read_file' and args.filepath then
+						arg_summary = vim.fn.fnamemodify(args.filepath, ':t')
+					elseif tool_name == 'edit_file' and args.filepath then
+						arg_summary = vim.fn.fnamemodify(args.filepath, ':t')
+					elseif tool_name == 'web_fetch' and args.url then
+						arg_summary = args.url
+					elseif tool_name == 'find_files' and args.filenames then
+						arg_summary = table.concat(args.filenames, ', ')
+					end
+				end
+
+				local msg = 'ET.nvim: Calling tool → ' .. tool_name
+				if arg_summary ~= '' then
+					msg = msg .. '(' .. arg_summary .. ')'
+				end
+				vim.notify(msg, vim.log.levels.INFO)
+
 				local result
 				if ok then
 					local success, tool_result = pcall(tools.dispatch, tool_name, args)
@@ -251,10 +271,11 @@ function M.prompt()
 						result = vim.fn.json_encode(tool_result)
 					else
 						result = vim.fn.json_encode({ error = tostring(tool_result) })
+						vim.notify('ET.nvim: Tool ' .. tool_name .. ' failed: ' .. tostring(tool_result), vim.log.levels.WARN)
 					end
 				else
-					result =
-						vim.fn.json_encode({ error = 'Failed to parse tool arguments: ' .. tc['function'].arguments })
+					result = vim.fn.json_encode({ error = 'Failed to parse tool arguments: ' .. tc['function'].arguments })
+					vim.notify('ET.nvim: Failed to parse arguments for ' .. tool_name .. ': ' .. tc['function'].arguments, vim.log.levels.WARN)
 				end
 
 				table.insert(msgs, {
