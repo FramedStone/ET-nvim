@@ -54,18 +54,10 @@ function M.find_files(filenames)
 end
 
 local function get_virtualized_lines(filepath)
-	-- Read from the user's live buffer if the file is open (preserves unsaved
-	-- changes for co-editing). Falls back to disk if not open in any buffer.
-	local lines = nil
-	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-		if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) == filepath then
-			lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-			break
-		end
-	end
-	if not lines then
-		lines = vim.fn.readfile(filepath)
-	end
+	-- Read from disk only (stable snapshot — unaffected by unsaved buffer changes).
+	-- Previously this scanned live buffers first, which caused the agent to chase
+	-- a moving target if the user was actively editing.
+	local lines = vim.fn.readfile(filepath)
 
 	local pending = {}
 	for _, edit in ipairs(states.pending_edits) do
