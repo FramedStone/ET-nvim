@@ -220,10 +220,11 @@ function M.prompt()
 	}
 
 	local function loop(msgs)
-		config._prompt(msgs, function(tool_calls)
+		config._prompt(msgs, function(tool_calls, content)
 			-- Tool calls received
 			local assistant_msg = {
 				role = 'assistant',
+				content = content or '',
 				tool_calls = {},
 			}
 

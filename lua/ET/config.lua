@@ -323,7 +323,7 @@ function M._prompt(messages, on_tool_call, on_done, opts)
 
 			-- Both providers use "tool_calls"; llama.cpp also sends "tool"
 			if choice.finish_reason == 'tool_calls' or choice.finish_reason == 'tool' then
-				on_tool_call(tool_calls)
+				on_tool_call(tool_calls, table.concat(full_content))
 				tool_calls = {}
 				state = 'done'
 				return
